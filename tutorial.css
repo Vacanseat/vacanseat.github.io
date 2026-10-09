@@ -1,0 +1,62 @@
+.legend .hub { position: static; }
+
+#tutorial { position: fixed; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; }
+#tutorial[hidden] { display: none; }
+.tut-top { display: flex; align-items: center; gap: 12px; padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 16px) 6px calc(var(--safe-l) + 16px); }
+.dots { flex: 1; display: flex; gap: 6px; }
+.dots i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
+.dots i.on { background: var(--open); }
+.dots i.cur { background: var(--sapphire-hi); }
+.skip { min-width: 56px; height: 44px; color: var(--muted); font-weight: 600; text-align: right; }
+.tut-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px calc(var(--safe-r) + 20px) 20px calc(var(--safe-l) + 20px); max-width: 560px; width: 100%; margin: 0 auto; }
+.tut-body h2 { font-size: 30px; margin-bottom: 12px; }
+.tut-body > p { font-size: 17px; color: #C9D4F0; margin-bottom: 20px; }
+.tut-foot { display: flex; gap: 10px; padding: 10px calc(var(--safe-r) + 20px) calc(var(--safe-b) + 16px) calc(var(--safe-l) + 20px); max-width: 560px; width: 100%; margin: 0 auto; }
+.tut-foot .btn { flex: 1; }
+.tut-foot .btn.ghost { flex: 0 0 38%; }
+
+.demo { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 18px; }
+.demo + .demo { margin-top: 12px; }
+.demo .hint { font-size: 14px; color: var(--muted); margin-top: 14px; }
+
+/* step 1 */
+.sd-top { display: flex; align-items: center; gap: 22px; }
+.seatdemo { --u: 11px; }
+.sd-read b { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
+.state { margin-top: 6px; font-weight: 700; font-size: 18px; }
+.state.open { color: var(--open); }
+.state.occ { color: var(--occ); }
+.gauge { position: relative; height: 12px; border-radius: 6px; background: var(--surface2); margin: 30px 0 4px; }
+.gauge i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--open); transition: width 0.4s ease, background 0.2s; }
+.gauge.over i { background: var(--occ); }
+.gauge u { position: absolute; top: -7px; bottom: -7px; width: 2px; background: var(--text); text-decoration: none; }
+.gauge u span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 12px; white-space: nowrap; color: var(--muted); }
+.seatdemo .btnrow .btn { padding: 0 8px; min-height: 48px; font-size: 15px; }
+.why { margin-top: 14px; font-size: 15px; color: #C9D4F0; min-height: 44px; }
+
+/* step 2 and 3 */
+.mt { margin-bottom: 18px; }
+.mt:last-of-type { margin-bottom: 0; }
+.mt-h { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
+.mt-h b { color: var(--text); font-size: 16px; }
+.mini { --u: 4.6px; }
+.mini .seat { cursor: pointer; }
+.mini .seat::before { content: ''; position: absolute; inset: -8px; }
+.mini .plate { margin-top: 4px; }
+.flexy { display: flex; flex-wrap: wrap; max-width: calc(var(--u) * 32); }
+.pair { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.arrive { animation: flip 0.7s ease; }
+
+/* step 4 */
+.sticker { display: flex; gap: 14px; align-items: center; margin-top: 12px; padding: 14px; border-radius: 18px; background: #EAF0FF; color: #0A1226; }
+.sticker b { display: block; font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 18px; }
+.sticker span { font-size: 14px; color: #34415F; }
+.qr { display: grid; grid-template-columns: repeat(9, 1fr); width: 72px; height: 72px; flex: none; gap: 1px; }
+.qr b { background: transparent; }
+.qr b.on { background: #0A1226; }
+
+/* step 6 */
+.key { display: grid; gap: 14px; }
+.key div { display: flex; gap: 14px; align-items: center; font-size: 16px; }
+.key .seat, .key .hub { --u: 5px; }
+.key .hub { position: static; margin: 0 6px 0 4px; }
