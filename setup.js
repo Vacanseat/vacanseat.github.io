@@ -2,6 +2,7 @@
   'use strict';
   const VS = window.VS;
   const KEY = 'vs_custom_v1';
+  const PUB = 'vs_custom_pub_v1';
   const FH = 14;      // builder floor depth in seat widths
   const MAX_TABLES = 40;
   const $ = (s, r) => (r || document).querySelector(s);
@@ -34,24 +35,48 @@
     return t;
   };
 
-  const saved = VS.store.get(KEY);
-  if (saved && Array.isArray(saved.t)) {
-    S.name = typeof saved.name === 'string' && saved.name ? saved.name.slice(0, 40) : S.name;
-    S.mode = saved.mode === 'private' ? 'private' : 'public';
-    S.t = saved.t.map(clean).filter(Boolean).slice(0, MAX_TABLES);
-  }
+  const KINDS = ['Restaurant', 'Cafe', 'College library'];
 
-  const save = () => VS.store.set(KEY, { name: S.name, mode: S.mode, t: S.t });
+  // Reads a stored floor (the draft or the published copy) and drops anything malformed.
+  const read = (d) => {
+    if (!d || !Array.isArray(d.t)) return null;
+    return {
+      name: typeof d.name === 'string' && d.name ? d.name.slice(0, 40) : 'My cafe',
+      mode: d.mode === 'private' ? 'private' : 'public',
+      kind: KINDS.indexOf(d.kind) > -1 ? d.kind : 'Cafe',
+      hours: typeof d.hours === 'string' ? d.hours.slice(0, 40) : '',
+      pin: /^\d{4}$/.test(d.pin) ? d.pin : '1234',
+      t: d.t.map(clean).filter(Boolean).slice(0, MAX_TABLES)
+    };
+  };
 
-  // Puts the saved floor into the list of places so it behaves like any other place.
+  S.kind = 'Cafe'; S.hours = ''; S.pin = '1234';
+  const draft = read(VS.store.get(KEY));
+  if (draft) Object.assign(S, draft);
+  let P = read(VS.store.get(PUB));   // the published copy: what the directory shows
+
+  const snap = () => ({ name: S.name, mode: S.mode, kind: S.kind, hours: S.hours, pin: S.pin, t: S.t.map((d) => Object.assign({}, d)) });
+  const save = () => { VS.store.set(KEY, snap()); drawState(); };
+  const pubState = () => (!P ? 'Draft, not published yet' : JSON.stringify(P) === JSON.stringify(snap()) ? 'Published' : 'Unpublished changes');
+
+  // Puts the published floor into the directory so it behaves like any other place.
   function publish() {
     const i = VS.PLACES.findIndex((p) => p.id === 'custom');
     if (i > -1) VS.PLACES.splice(i, 1);
-    if (!S.t.length) return null;
-    const p = { id: 'custom', name: S.name.trim() || 'My place', kind: 'Your floor', mode: S.mode, hours: 'Built on this phone', busy: 0.55, t: S.t.map((d) => Object.assign({}, d)) };
+    if (!P || !P.t.length) return null;
+    const p = { id: 'custom', name: P.name.trim() || 'My place', kind: P.kind, mode: P.mode, hours: P.hours.trim() || 'Hours not set', pin: P.pin, busy: 0.55, t: P.t.map((d) => Object.assign({}, d)) };
     VS.seedPlace(p);
     VS.PLACES.unshift(p);
     return p;
+  }
+
+  function doPublish() {
+    if (!S.t.length) return say('Place at least one table first.');
+    P = snap();
+    VS.store.set(PUB, P);
+    publish();
+    drawState();
+    say('Published. It now shows in the places list. In the real product this goes to the cloud so every device sees it. In this demo it lives on this phone.');
   }
 
   /* ---------- drawing ---------- */
@@ -95,18 +120,35 @@
 
   function drawMode() {
     $('#s-mode').innerHTML = ['public', 'private'].map((m) => `<button data-mode="${m}" aria-pressed="${S.mode === m}">${m[0].toUpperCase() + m.slice(1)}</button>`).join('');
+    $('#s-pinwrap').hidden = S.mode !== 'private';
+  }
+
+  function drawKind() {
+    $('#s-kind').innerHTML = KINDS.map((k) => `<button data-kind="${k}" aria-pressed="${S.kind === k}">${k === 'College library' ? 'College' : k}</button>`).join('');
+  }
+
+  // Header line plus the "view it" button, which only exists once something is published.
+  function drawState() {
+    const el = $('#s-state');
+    if (!el) return;
+    el.textContent = pubState() + ', on this phone';
+    $('#s-viewrow').innerHTML = P && P.t.length ? '<button class="btn ghost" data-slive>View published floor</button>' : '';
   }
 
   function render(view) {
     view.innerHTML = `
       <header class="bar">
         <button class="iconbtn" data-back aria-label="Back to places">${VS.I.back}</button>
-        <div class="bar-title"><h1>Set up your floor</h1><p>Saved on this phone</p></div>
+        <div class="bar-title"><h1>Set up your floor</h1><p id="s-state"></p></div>
         <button class="iconbtn" data-biz aria-label="How setup works">${VS.I.help}</button>
       </header>
       <div class="wrap">
+        <div class="banner ok">Venue staff view. Visitors can look at a published floor but cannot change it.</div>
         <label class="field"><span>Place name</span><input id="s-name" maxlength="40" autocomplete="off" value="${VS.esc(S.name)}"></label>
-        <div class="seg" id="s-mode" role="group" aria-label="Who can see this floor"></div>
+        <div class="field"><span>Type of place</span><div class="seg tight" id="s-kind" role="group" aria-label="Type of place"></div></div>
+        <label class="field"><span>Hours shown to visitors</span><input id="s-hours" maxlength="40" autocomplete="off" placeholder="Open until 10 PM" value="${VS.esc(S.hours)}"></label>
+        <div class="field"><span>Who can see the floor</span><div class="seg tight" id="s-mode" role="group" aria-label="Who can see this floor"></div></div>
+        <label class="field" id="s-pinwrap"><span>Staff PIN, 4 digits</span><input id="s-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="${VS.esc(S.pin)}"></label>
         <section class="sect"><h2>Choose a table</h2><p>Pick the closest type, then adjust the size and which sides have chairs.</p>
           <div class="presets" id="s-presets"></div>
           <div class="steppers" id="s-steps"></div>
@@ -117,10 +159,12 @@
           <div class="floor build" id="s-floor"></div>
           <div class="status" id="s-status" role="status" aria-live="polite"></div>
           <div id="s-sel"></div>
-          <div class="btnrow"><button class="btn ghost" data-sclear>Clear floor</button><button class="btn" data-slive>See it live</button></div>
+          <div class="btnrow"><button class="btn ghost" data-sclear>Clear floor</button><button class="btn" data-spub>Publish</button></div>
+          <div class="btnrow" id="s-viewrow"></div>
+          <p class="note">Your changes save to a draft as you go. Visitors only see the floor after you publish.</p>
         </section>
       </div>`;
-    drawMode(); drawPresets(); drawShape(); drawFloor(); drawSel();
+    drawKind(); drawMode(); drawPresets(); drawShape(); drawFloor(); drawSel(); drawState();
   }
 
   /* ---------- actions ---------- */
@@ -146,7 +190,7 @@
     if (S.t.some((o) => overlaps(t, f, o))) return say('A table is already there. Tap a clear spot.');
     S.t.push(t);
     S.sel = -1;
-    save(); publish();
+    save();
     drawFloor(); drawSel(); drawShape();
     say(`Placed ${t.n} with ${VS.chairsText(VS.chairs(t))}. ${S.t.length} table${S.t.length > 1 ? 's' : ''} on the floor.`);
   }
@@ -185,16 +229,15 @@
     S.clearArmed = false;
     S.t = []; S.sel = -1;
     btn.textContent = 'Clear floor';
-    save(); publish();
+    save();
     drawFloor(); drawSel(); drawShape();
     say('Floor cleared.');
   }
 
   function goLive() {
-    if (!S.t.length) return say('Place at least one table first.');
-    save();
-    publish();
-    location.hash = S.mode === 'public' ? '#/p/custom' : '#/p/custom?staff';
+    if (!P || !P.t.length) return say('Publish first.');
+    VS.unlocked.custom = true;
+    location.hash = P.mode === 'public' ? '#/p/custom' : '#/p/custom?staff';
   }
 
   /* ---------- events (only while the builder is on screen) ---------- */
@@ -206,11 +249,13 @@
     if ((el = t.closest('[data-preset]'))) return setPreset(el.dataset.preset);
     if ((el = t.closest('[data-step]'))) return nudge(el.dataset.step, +el.dataset.d);
     if ((el = t.closest('[data-side]'))) return toggleSide(el.dataset.side);
-    if ((el = t.closest('[data-mode]'))) { S.mode = el.dataset.mode; save(); publish(); return drawMode(); }
-    if (t.closest('[data-sremove]')) { S.t.splice(S.sel, 1); S.sel = -1; save(); publish(); drawFloor(); drawSel(); drawShape(); return say('Table removed.'); }
+    if ((el = t.closest('[data-mode]'))) { S.mode = el.dataset.mode; save(); return drawMode(); }
+    if (t.closest('[data-sremove]')) { S.t.splice(S.sel, 1); S.sel = -1; save(); drawFloor(); drawSel(); drawShape(); return say('Table removed.'); }
     if (t.closest('[data-sdone]')) { S.sel = -1; drawFloor(); drawSel(); return; }
     if ((el = t.closest('[data-sclear]'))) return clearFloor(el);
+    if (t.closest('[data-spub]')) return doPublish();
     if (t.closest('[data-slive]')) return goLive();
+    if ((el = t.closest('[data-kind]'))) { S.kind = el.dataset.kind; save(); return drawKind(); }
     const fl = $('#s-floor');
     if (fl && fl.contains(t)) {
       const tb = t.closest('.tbl');
@@ -221,9 +266,13 @@
   });
 
   document.addEventListener('input', (e) => {
-    if (VS.cur !== 'setup' || e.target.id !== 's-name') return;
-    S.name = e.target.value;
-    save(); publish();
+    if (VS.cur !== 'setup') return;
+    const id = e.target.id;
+    if (id === 's-name') S.name = e.target.value;
+    else if (id === 's-hours') S.hours = e.target.value;
+    else if (id === 's-pin') { const v = e.target.value.replace(/\D/g, '').slice(0, 4); e.target.value = v; if (v.length === 4) S.pin = v; else return; }
+    else return;
+    save();
   });
 
   VS.setup = { render, publish, fit: () => VS.fitFloor($('#s-floor'), FH) };

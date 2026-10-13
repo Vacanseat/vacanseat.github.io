@@ -14,6 +14,20 @@
 
   const setCur = (c) => { current = c; VS.cur = c.type; };
 
+  // Demo-only access control. The real product checks these on a server.
+  const DEMO_VENUE_PIN = '1234';
+  VS.unlocked = {};
+  try { VS.admin = sessionStorage.getItem('vs_admin') === '1'; } catch (e) { VS.admin = false; }
+  const getSaved = () => { const v = VS.store.get('vs_saved_v1'); return Array.isArray(v) ? v : []; };
+  const isSaved = (id) => getSaved().indexOf(id) > -1;
+  const toggleSaved = (id) => {
+    const a = getSaved(), i = a.indexOf(id);
+    if (i > -1) a.splice(i, 1); else a.push(id);
+    VS.store.set('vs_saved_v1', a);
+    return i === -1;
+  };
+  const pinOf = (p) => p.pin || DEMO_VENUE_PIN;
+
   /* ---------- list ---------- */
 
   function renderList() {
@@ -23,10 +37,10 @@
         <h1 class="title">Find a seat</h1>
         <label class="search"><span class="sr">Search places</span>${VS.I.search}<input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search places" value="${VS.esc(state.q)}"></label>
         <div class="seg" role="group" aria-label="Show places">
-          ${['all', 'public', 'private'].map((f) => `<button data-filter="${f}" aria-pressed="${state.filter === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('')}
+          ${['all', 'saved', 'public', 'private'].map((f) => `<button data-filter="${f}" aria-pressed="${state.filter === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('')}
         </div>
         <div id="cards"></div>
-        <div class="biz"><h3>Run a library, cafe or restaurant?</h3><p>See how a business sets up its floor, then build one yourself.</p><button class="btn block" data-biz>Set up your floor</button></div>
+        <div class="biz"><h3>Run a library, cafe or restaurant?</h3><p>Venue staff set up and publish the floor. Visitors can only look. Sign in with the demo PIN to try it.</p><button class="btn block" data-biz>Set up your floor</button></div>
         <p class="foot">Demo data. Sensor readings are simulated for this class project.</p>
       </div>`;
     drawCards();
@@ -35,12 +49,15 @@
 
   function drawCards() {
     const q = state.q.trim().toLowerCase();
-    const items = VS.PLACES.filter((p) => (state.filter === 'all' || p.mode === state.filter) && (!q || (p.name + ' ' + p.kind).toLowerCase().includes(q)));
+    const saved = getSaved();
+    const items = VS.PLACES.filter((p) => (state.filter === 'all' || (state.filter === 'saved' ? saved.indexOf(p.id) > -1 : p.mode === state.filter)) && (!q || (p.name + ' ' + p.kind).toLowerCase().includes(q)));
     const rank = (p) => (p.id === 'custom' ? 0 : p.mode === 'public' ? 1 : 2);
     items.sort((a, b) => rank(a) - rank(b) || (a.mode === 'public' ? VS.counts(b).open - VS.counts(a).open : a.name.localeCompare(b.name)));
     $('#cards').innerHTML = items.length
       ? items.map((p) => VS.cardHTML(p)).join('')
-      : '<p class="sub" style="padding:18px 4px">No places match. Try a building or a cafe name.</p>';
+      : state.filter === 'saved' && !q
+        ? '<p class="sub" style="padding:18px 4px">Nothing saved yet. Open a place and tap Save to My locations.</p>'
+        : '<p class="sub" style="padding:18px 4px">No places match. If a venue uses Vacantseat, search its name or type. If it does not show up, it has not set up yet.</p>';
   }
 
   /* ---------- place ---------- */
@@ -54,16 +71,19 @@
         <span class="tag ${staff ? 'staff' : 'pub'}">${staff ? 'Staff view' : 'Public'}</span>
       </header>
       <div class="wrap">
-        ${staff ? '<div class="banner">Staff preview. Visitors only see a locked card for this place.</div>' : ''}
+        ${staff ? '<div class="banner">Staff view. You unlocked this with the PIN. Visitors see a locked card.</div>' : ''}
         <div class="sum"><div class="o"><strong id="nOpen">${c.open}</strong>open</div><div class="t"><strong id="nTaken">${c.taken}</strong>taken</div><span class="live"><i></i>Live, simulated</span></div>
-        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table hub</span></div>
+        <button class="btn ghost block savebtn" data-save="${p.id}" aria-pressed="${isSaved(p.id)}">${isSaved(p.id) ? 'Saved to My locations' : 'Save to My locations'}</button>
+        <div class="details"><div><span>Hours</span><b>${VS.esc(p.hours)}</b></div><div><span>Setup</span><b>${p.tables.length} tables, ${c.total} chairs</b></div><div><span>Access</span><b>${p.mode === 'public' ? 'Public' : 'Private, PIN'}</b></div></div>
+        <p class="managed">${/college/i.test(p.kind) ? 'Managed by college staff. Students can view the floor but cannot change it.' : 'Managed by the venue. Visitors can view the floor but cannot change it.'}</p>
+        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table puck</span></div>
         <div class="floor" id="floor">${p.tables.map((t, ti) => VS.tableBtn(t, ti, t.seats, 'button')).join('')}</div>
         <div class="lvl"><p>Demo controls. Change how busy the room is.</p>
           <div class="seg" role="group" aria-label="Room busyness">
             ${[['Quiet', 0.2], ['Steady', p.base], ['Packed', 0.93]].map(([n, v]) => `<button data-level="${v}" aria-pressed="${Math.abs(p.busy - v) < 0.01}">${n}</button>`).join('')}
           </div>
         </div>
-        ${p.id === 'custom' ? '<div class="btnrow"><button class="btn ghost" data-edit>Edit floor</button></div>' : ''}
+        ${p.id === 'custom' && VS.admin ? '<div class="btnrow"><button class="btn ghost" data-edit>Edit floor</button></div>' : ''}
         <p class="foot">Demo data. Tap a table to see each chair's reading.</p>
       </div>`;
     fit();
@@ -131,7 +151,7 @@
       <div class="sh-head"><div><h2>Table ${VS.esc(t.n)}</h2><p class="sub">${size}, ${tc.total} chair${tc.total > 1 ? 's' : ''}</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
       <p class="sh-big"><strong>${tc.open}</strong>of ${tc.total} open</p>
       <div class="sgrid">${t.seats.map((s, i) => `<div class="cell"><span class="seat ${VS.seatCls(s)}"></span><small>${s.lb}<span class="sr"> pounds, chair ${i + 1}, ${VS.isOcc(s) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
-      <p class="note">Numbers are pounds on each chair. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The hub in the middle of this table adds the chairs up.</p>`;
+      <p class="note">Numbers are pounds on each chair. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The puck under this table adds the chairs up.</p>`;
   }
 
   function openTable(ti) {
@@ -145,8 +165,44 @@
     showSheet(`<div class="grab"></div>
       <div class="lockicon">${VS.I.lock(28)}</div>
       <h2>${VS.esc(p.name)} is private</h2>
-      <p class="note" style="font-size:16px;margin-top:10px">The owner picks who sees the floor when they buy the seating. Staff see open tables so they can seat guests faster. Everyone else sees this locked card.</p>
-      <div class="btnrow"><button class="btn ghost" data-close>Close</button><button class="btn" data-staff="${p.id}">Preview staff view</button></div>`);
+      <p class="note" style="font-size:16px;margin-top:10px">The venue keeps this floor for staff. Staff enter their PIN to see open tables. Everyone else sees this locked card.</p>
+      <label class="field" style="margin-top:16px"><span>Staff PIN</span><input id="pin-in" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
+      <p class="err" id="pin-err" role="alert"></p>
+      <p class="note" style="margin-top:0">Demo PIN: ${pinOf(p) === DEMO_VENUE_PIN ? DEMO_VENUE_PIN : 'the PIN you set in the builder'}. In the real product the server checks it.</p>
+      <div class="btnrow"><button class="btn ghost" data-close>Close</button><button class="btn" data-staff="${p.id}">Unlock</button></div>`);
+  }
+
+  /* ---------- venue sign-in ---------- */
+
+  function renderGate() {
+    view.innerHTML = `
+      <header class="bar"><button class="iconbtn" data-home aria-label="Back to places">${VS.I.back}</button><div class="bar-title"><h1>Venue sign-in</h1><p>For staff who run a floor</p></div></header>
+      <div class="wrap">
+        <div class="lockicon">${VS.I.lock(28)}</div>
+        <p class="note" style="font-size:16px;margin-top:0">Only venue staff can set up or change a floor. Colleges work the same way: staff edit, students only view.</p>
+        <label class="field" style="margin-top:18px"><span>Venue PIN</span><input id="gate-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
+        <p class="err" id="gate-err" role="alert"></p>
+        <p class="note" style="margin-top:0">Demo PIN: ${DEMO_VENUE_PIN}. In the real product the PIN is checked on Vacantseat's server and published floors reach every device. This demo checks it on the phone.</p>
+        <div class="btnrow"><button class="btn" data-gate-go>Sign in</button></div>
+      </div>`;
+  }
+
+  function gateGo() {
+    const v = ($('#gate-pin') || {}).value;
+    if (v !== DEMO_VENUE_PIN) { $('#gate-err').textContent = 'That PIN is not right. Try ' + DEMO_VENUE_PIN + ' for the demo.'; return; }
+    VS.admin = true;
+    try { sessionStorage.setItem('vs_admin', '1'); } catch (e) { /* fine */ }
+    route();
+  }
+
+  function staffGo(id) {
+    const p = VS.PLACES.find((x) => x.id === id);
+    const v = ($('#pin-in') || {}).value;
+    if (!p || v !== pinOf(p)) { const er = $('#pin-err'); if (er) er.textContent = 'That PIN is not right.'; return; }
+    VS.unlocked[id] = true;
+    closeSheet();
+    fromList = true;
+    location.hash = '#/p/' + id + '?staff';
   }
 
   /* ---------- routing ---------- */
@@ -155,6 +211,12 @@
     const hash = location.hash || '#/';
     closeSheet();
     if (current.type === 'list') listScroll = window.scrollY;
+    if (hash === '#/setup' && !VS.admin) {
+      setCur({ type: 'gate' });
+      renderGate();
+      window.scrollTo(0, 0);
+      return;
+    }
     if (hash === '#/setup') {
       setCur({ type: 'setup' });
       VS.setup.render(view);
@@ -165,10 +227,16 @@
     const m = hash.match(/^#\/p\/([\w-]+)(\?staff)?$/);
     if (m) {
       const p = VS.PLACES.find((x) => x.id === m[1]);
-      if (p && (p.mode === 'public' || m[2])) {
-        setCur({ type: 'place', p, staff: !!m[2] });
-        renderPlace(p, !!m[2]);
+      if (p && (p.mode === 'public' || (m[2] && VS.unlocked[p.id]))) {
+        setCur({ type: 'place', p, staff: p.mode === 'private' });
+        renderPlace(p, p.mode === 'private');
         window.scrollTo(0, 0);
+        return;
+      }
+      if (p && p.mode === 'private') {
+        setCur({ type: 'list' });
+        renderList();
+        openLocked(p.id);
         return;
       }
     }
@@ -187,7 +255,15 @@
     if ((el = t.closest('[data-edit]'))) { fromList = false; location.hash = '#/setup'; return; }
     if ((el = t.closest('[data-go]'))) { fromList = true; location.hash = '#/p/' + el.dataset.go; return; }
     if ((el = t.closest('[data-lock]'))) return openLocked(el.dataset.lock);
-    if ((el = t.closest('[data-staff]'))) { closeSheet(); fromList = true; location.hash = '#/p/' + el.dataset.staff + '?staff'; return; }
+    if ((el = t.closest('[data-staff]'))) return staffGo(el.dataset.staff);
+    if (t.closest('[data-gate-go]')) return gateGo();
+    if (t.closest('[data-home]')) { location.hash = '#/'; return; }
+    if ((el = t.closest('[data-save]'))) {
+      const on = toggleSaved(el.dataset.save);
+      el.setAttribute('aria-pressed', String(on));
+      el.textContent = on ? 'Saved to My locations' : 'Save to My locations';
+      return;
+    }
     if ((el = t.closest('[data-back]'))) { if (fromList) history.back(); else location.hash = '#/'; fromList = false; return; }
     if ((el = t.closest('[data-filter]'))) { state.filter = el.dataset.filter; $$('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b === el))); return drawCards(); }
     if ((el = t.closest('[data-level]'))) {
@@ -205,6 +281,10 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sheet.classList.contains('on')) closeSheet();
+    if (e.key === 'Enter') {
+      if (e.target.id === 'gate-pin') gateGo();
+      else if (e.target.id === 'pin-in' && sheetCtx === null) { const b = $('[data-staff]', sheet); if (b) staffGo(b.dataset.staff); }
+    }
   });
 
   window.addEventListener('hashchange', route);
