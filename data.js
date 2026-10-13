@@ -18,7 +18,8 @@ VS.COLS = 14;
 VS.PAD = 0.5; // empty margin around the floor, in seat widths
 
 (function () {
-  const T = (n, x, y, r, c, sd) => ({ n, x, y, r, c, sd });
+  // bk marks a booth: no feet to sense, so staff set its status by hand. old seeds one that nobody has updated in 3 hours.
+  const T = (n, x, y, r, c, sd, bk, old) => Object.assign({ n, x, y, r, c, sd }, bk ? { bk: 1 } : {}, old ? { old: 1 } : {});
 
   VS.PLACES = [
     {
@@ -54,7 +55,8 @@ VS.PAD = 0.5; // empty margin around the floor, in seat widths
         T('T1', 0, 3, 1, 1, 'ns'), T('T2', 2, 3, 1, 1, 'ns'), T('T3', 4, 3, 1, 1, 'ns'), T('T4', 6, 3, 1, 1, 'ns'),
         T('T5', 8, 3, 1, 1, 'nsew'), T('T6', 12, 3, 1, 1, 'ns'),
         T('M1', 0, 7, 1, 4, 'nsew'), T('S1', 8, 7, 0, 2, 'n'), T('S2', 11, 7, 0, 2, 'n'),
-        T('CT', 0, 11, 1, 6, 's')
+        T('CT', 0, 11, 1, 6, 's'),
+        T('K1', 0, 14, 1, 2, 'ns', 1), T('K2', 3, 14, 1, 2, 'ns', 1, 1)
       ]
     },
     {
@@ -65,7 +67,8 @@ VS.PAD = 0.5; // empty margin around the floor, in seat widths
         T('B4', 9, 0, 1, 2, 'ns'), T('B5', 12, 0, 1, 2, 'ns'),
         T('T1', 0, 4, 1, 1, 'nsew'), T('T2', 5, 4, 1, 1, 'nsew'), T('T3', 10, 4, 1, 1, 'nsew'),
         T('X1', 0, 8, 1, 2, 'nsew'), T('X2', 5, 8, 1, 2, 'nsew'), T('X3', 10, 8, 1, 2, 'nsew'),
-        T('BAR', 0, 12, 1, 10, 'n')
+        T('BAR', 0, 12, 1, 10, 'n'),
+        T('K1', 0, 15, 1, 2, 'ns', 1), T('K2', 3, 15, 1, 2, 'ns', 1), T('K3', 6, 15, 1, 2, 'ns', 1), T('K4', 9, 15, 1, 2, 'ns', 1)
       ]
     },
     {

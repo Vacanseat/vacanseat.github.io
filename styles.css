@@ -210,3 +210,14 @@ button.card:active { background: var(--surface2); }
 .roles > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
 .roles b { font-size: 15px; }
 .roles span { font-size: 14px; color: var(--muted); }
+
+/* booths: set by hand, so they look different from sensed chairs */
+.bench { display: block; min-width: 0; border-radius: calc(var(--u) * 2); border: 2px dashed var(--open); background: rgba(47, 221, 164, 0.2); }
+.bench.occ { border-color: #B79BFF; background: repeating-linear-gradient(135deg, rgba(183, 155, 255, 0.55) 0 3px, rgba(90, 51, 192, 0.85) 3px 6px); }
+.bench.unk { border: 2px dotted var(--priv); background: rgba(125, 138, 168, 0.16); }
+.legend .bench { --u: 2.8px; width: 22px; height: 12px; display: inline-block; }
+.bksum { margin: -2px 0 10px; font-size: 14px; color: var(--muted); }
+.bksum b { color: var(--text); font-weight: 600; }
+.bigstate { font-family: 'Bricolage Grotesque', system-ui, sans-serif; font-size: 30px; margin: 6px 0 2px; }
+.bigstate.open { color: var(--open); } .bigstate.occ { color: var(--occ); } .bigstate.unk { color: var(--priv); }
+.when { font-size: 14px; color: var(--muted); margin-bottom: 4px; }

@@ -35,6 +35,7 @@
 
   // Chair positions (1-based grid cells) in a fixed order: north, east, south, west.
   VS.slots = (t) => {
+    if (t.bk) return [];
     const k = VS.sides(t), f = VS.foot(t), out = [];
     if (k.n) for (let i = 0; i < t.c; i++) out.push({ row: 1, col: f.ox + 1 + i });
     if (k.e) for (let j = 0; j < t.r; j++) out.push({ row: f.oy + 1 + j, col: f.ox + t.c + 1 });
@@ -47,6 +48,7 @@
   VS.heightOf = (list) => list.reduce((m, t) => Math.max(m, t.y + VS.foot(t).h), 0);
 
   VS.sidesText = (t) => {
+    if (t.bk) return 'booth, set by staff';
     if (t.r === 0) return t.c === 1 ? 'lounge chair' : 'sofa';
     const n = VS.sides(t);
     const count = ['n', 'e', 's', 'w'].filter((x) => n[x]).length;
@@ -71,6 +73,11 @@
 
   VS.tbHTML = (t, seats) => {
     const f = VS.foot(t), slots = VS.slots(t);
+    if (t.bk) {
+      const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
+      const bench = (row) => `<span class="bench ${cls}" style="grid-row:${row};grid-column:${f.ox + 1}/span ${t.c}"></span>`;
+      return bench(1) + `<span class="top" style="grid-row:${f.oy + 1}/span ${t.r};grid-column:${f.ox + 1}/span ${t.c}"><span class="tl"><b>${VS.esc(t.n)}</b>${t.c >= 3 ? '<em>by hand</em>' : ''}</span></span>` + bench(f.oy + t.r + 1);
+    }
     let h = '';
     if (t.r > 0) {
       const open = seats.filter((s) => s && !VS.isOcc(s)).length;
@@ -89,7 +96,8 @@
   VS.tableBtn = (t, ti, seats, tag, extra) => {
     const left = `left:calc(var(--u)*${(t.x + VS.PAD) * 7});top:calc(var(--u)*${(t.y + VS.PAD) * 7})`;
     const open = seats.filter((s) => s && !VS.isOcc(s)).length;
-    return `<${tag} class="tb tbl ${extra || ''}" data-t="${ti}" style="${VS.tbStyle(t)};${left}" aria-label="Table ${VS.esc(t.n)}, ${t.r}x${t.c}, ${open} of ${seats.length} seats open">${VS.tbHTML(t, seats)}</${tag}>`;
+    const lbl = t.bk ? `Booth ${VS.esc(t.n)}, set by staff, ${{ o: 'open', t: 'taken', u: 'unknown' }[VS.bState(t)]}` : `Table ${VS.esc(t.n)}, ${t.r}x${t.c}, ${open} of ${seats.length} seats open`;
+    return `<${tag} class="tb tbl ${extra || ''}" data-t="${ti}" style="${VS.tbStyle(t)};${left}" aria-label="${lbl}">${VS.tbHTML(t, seats)}</${tag}>`;
   };
 
   VS.counts = (p) => {

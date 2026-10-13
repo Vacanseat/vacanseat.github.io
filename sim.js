@@ -24,14 +24,33 @@
     else if (s.st === 't' && s.under >= VS.FREE_SECS) s.st = 'o';
   };
 
+  // Booths have no feet, so staff set them by hand. bs holds the last status and when it was set.
+  // Nothing set for BOOTH_HOURS hours reads as unknown, so a forgotten booth never stays confidently wrong.
+  VS.BOOTH_HOURS = 2;
+  VS.seedBooth = (busy, old) => ({ st: Math.random() < busy ? 't' : 'o', at: Date.now() - (old ? 3 * 3600e3 : rnd(5, 90) * 60e3) });
+  VS.bState = (t) => (!t.bs ? 'o' : Date.now() - t.bs.at > VS.BOOTH_HOURS * 3600e3 ? 'u' : t.bs.st);
+  VS.ago = (at) => {
+    const m = Math.max(0, Math.round((Date.now() - at) / 60e3));
+    return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago';
+  };
+  VS.boothCounts = (p) => {
+    const c = { open: 0, taken: 0, unknown: 0, total: 0 };
+    p.tables.forEach((t) => { if (!t.bk) return; c.total++; const s = VS.bState(t); if (s === 't') c.taken++; else if (s === 'u') c.unknown++; else c.open++; });
+    return c;
+  };
+
   VS.seedPlace = (p) => {
     p.base = p.busy;
-    p.tables = p.t.map((d) => Object.assign({}, d, { seats: VS.slots(d).map(() => VS.mkSeat(Math.random() < p.busy)) }));
+    p.tables = p.t.map((d) => {
+      const t = Object.assign({}, d, { seats: VS.slots(d).map(() => VS.mkSeat(Math.random() < p.busy)) });
+      if (d.bk) t.bs = VS.seedBooth(p.busy, d.old);
+      return t;
+    });
   };
 
   VS.rerollPlace = (p, busy) => {
     p.busy = busy;
-    p.tables.forEach((t) => { t.seats = t.seats.map(() => VS.mkSeat(Math.random() < busy)); });
+    p.tables.forEach((t) => { t.seats = t.seats.map(() => VS.mkSeat(Math.random() < busy)); if (t.bk) t.bs = VS.seedBooth(busy, t.old); });
   };
 
   VS.tickPlaces = (places) => {

@@ -15,7 +15,8 @@
     { id: 'six', name: 'Six-top', pre: 'T', r: 1, c: 2, sd: 'nsew' },
     { id: 'conf', name: 'Conference', pre: 'C', r: 1, c: 8, sd: 'nsew' },
     { id: 'desk', name: 'Study desk', pre: 'D', r: 1, c: 1, sd: 'n' },
-    { id: 'lounge', name: 'Lounge chair', pre: 'L', r: 0, c: 1, sd: 'n' }
+    { id: 'lounge', name: 'Lounge chair', pre: 'L', r: 0, c: 1, sd: 'n' },
+    { id: 'booth', name: 'Booth', pre: 'K', r: 1, c: 2, sd: 'ns', bk: true }
   ];
   const preset = (id) => VS.PRESETS.find((p) => p.id === id);
 
@@ -26,10 +27,12 @@
 
   const clean = (d) => {
     if (!d || typeof d.n !== 'string' || typeof d.sd !== 'string') return null;
-    const r = clamp(Math.round(+d.r), 0, 4), c = clamp(Math.round(+d.c), 1, 10);
-    const sd = ['n', 'e', 's', 'w'].filter((x) => d.sd.indexOf(x) > -1).join('');
+    const bk = !!d.bk;
+    const r = bk ? clamp(Math.round(+d.r), 1, 2) : clamp(Math.round(+d.r), 0, 4), c = clamp(Math.round(+d.c), 1, bk ? 4 : 10);
+    const sd = bk ? 'ns' : ['n', 'e', 's', 'w'].filter((x) => d.sd.indexOf(x) > -1).join('');
     if (!sd) return null;
     const t = { n: d.n.slice(0, 8), x: Math.round(+d.x), y: Math.round(+d.y), r, c, sd };
+    if (bk) t.bk = 1;
     const f = VS.foot(t);
     if (!(t.x >= 0 && t.y >= 0 && t.x + f.w <= VS.COLS && t.y + f.h <= FH)) return null;
     return t;
@@ -85,22 +88,22 @@
 
   function drawPresets() {
     $('#s-presets').innerHTML = VS.PRESETS.map((p) =>
-      `<button data-preset="${p.id}" aria-pressed="${S.preset === p.id}">${VS.esc(p.name)}<small>${VS.chairsText(VS.chairs(p))}</small></button>`).join('');
+      `<button data-preset="${p.id}" aria-pressed="${S.preset === p.id}">${VS.esc(p.name)}<small>${p.bk ? 'set by hand' : VS.chairsText(VS.chairs(p))}</small></button>`).join('');
   }
 
   function drawShape() {
-    const sh = S.shape, lounge = sh.r === 0;
+    const sh = S.shape, lounge = sh.r === 0, bk = !!sh.bk;
     const step = (key, label, val, min, max, off) => `<div class="stepper"><button data-step="${key}" data-d="-1" aria-label="Less ${label}"${off || val <= min ? ' disabled' : ''}>${VS.I.minus}</button>
       <div><small>${label}</small><strong>${off ? '-' : val}</strong></div>
       <button data-step="${key}" data-d="1" aria-label="More ${label}"${off || val >= max ? ' disabled' : ''}>${VS.I.plus}</button></div>`;
-    $('#s-steps').innerHTML = step('c', 'Length', sh.c, 1, lounge ? 4 : 10, false) + step('r', 'Width', sh.r, 1, 4, lounge);
+    $('#s-steps').innerHTML = step('c', 'Length', sh.c, 1, bk || lounge ? 4 : 10, false) + step('r', 'Width', sh.r, 1, bk ? 2 : 4, lounge);
     const k = VS.sides(sh);
     $('#s-sides').innerHTML = [['n', 'North'], ['e', 'East'], ['s', 'South'], ['w', 'West']].map(([key, name]) =>
-      `<button data-side="${key}" aria-pressed="${k[key]}" aria-label="Chairs on the ${name.toLowerCase()} side"${lounge && (key === 'e' || key === 'w') ? ' disabled' : ''}>${key.toUpperCase()}</button>`).join('');
-    const t = { n: nextName(), r: sh.r, c: sh.c, sd: sh.sd };
+      `<button data-side="${key}" aria-pressed="${k[key]}" aria-label="Chairs on the ${name.toLowerCase()} side"${bk || (lounge && (key === 'e' || key === 'w')) ? ' disabled' : ''}>${key.toUpperCase()}</button>`).join('');
+    const t = Object.assign({ n: nextName(), r: sh.r, c: sh.c, sd: sh.sd }, bk ? { bk: 1 } : {});
     const f = VS.foot(t);
     $('#s-preview').innerHTML = `<div class="tb" style="${VS.tbStyle(t)}">${VS.tbHTML(t, allOpen(t))}</div>
-      <p>${VS.chairsText(VS.chairs(t))}, ${f.w} by ${f.h} squares on the grid</p>`;
+      <p>${bk ? 'Booth, no sensors. Staff set it open or taken by hand.' : VS.chairsText(VS.chairs(t)) + ','} ${f.w} by ${f.h} squares on the grid</p>`;
   }
 
   function drawFloor() {
@@ -184,6 +187,7 @@
   function place(cx, cy) {
     if (S.t.length >= MAX_TABLES) return say('That is the most tables this demo holds.');
     const sh = S.shape, t = { n: nextName(), x: 0, y: 0, r: sh.r, c: sh.c, sd: sh.sd };
+    if (sh.bk) t.bk = 1;
     const f = VS.foot(t);
     t.x = clamp(cx - Math.floor(f.w / 2), 0, VS.COLS - f.w);
     t.y = clamp(cy - Math.floor(f.h / 2), 0, FH - f.h);
@@ -192,26 +196,27 @@
     S.sel = -1;
     save();
     drawFloor(); drawSel(); drawShape();
-    say(`Placed ${t.n} with ${VS.chairsText(VS.chairs(t))}. ${S.t.length} table${S.t.length > 1 ? 's' : ''} on the floor.`);
+    say(t.bk ? `Placed booth ${t.n}. Staff set it by hand. ${S.t.length} on the floor.` : `Placed ${t.n} with ${VS.chairsText(VS.chairs(t))}. ${S.t.length} table${S.t.length > 1 ? 's' : ''} on the floor.`);
   }
 
   function setPreset(id) {
     const p = preset(id);
     if (!p) return;
     S.preset = id;
-    S.shape = { r: p.r, c: p.c, sd: p.sd };
+    S.shape = { r: p.r, c: p.c, sd: p.sd, bk: !!p.bk };
     drawPresets(); drawShape();
   }
 
   function nudge(key, d) {
-    const sh = S.shape, lounge = sh.r === 0;
-    if (key === 'c') sh.c = clamp(sh.c + d, 1, lounge ? 4 : 10);
-    else if (!lounge) sh.r = clamp(sh.r + d, 1, 4);
+    const sh = S.shape, lounge = sh.r === 0, bk = !!sh.bk;
+    if (key === 'c') sh.c = clamp(sh.c + d, 1, bk || lounge ? 4 : 10);
+    else if (!lounge) sh.r = clamp(sh.r + d, 1, bk ? 2 : 4);
     drawShape();
   }
 
   function toggleSide(key) {
     const sh = S.shape, has = sh.sd.indexOf(key) > -1;
+    if (sh.bk) return say('A booth always has a bench on each side.');
     if (has && sh.sd.length === 1) return say('A table needs chairs on at least one side.');
     sh.sd = ['n', 'e', 's', 'w'].filter((x) => (x === key ? !has : sh.sd.indexOf(x) > -1)).join('');
     drawShape();

@@ -21,7 +21,7 @@
     el.innerHTML = `<div class="demo seatdemo">
       <div class="sd-top">
         <span class="seat open" id="d-seat" aria-hidden="true"></span>
-        <div class="sd-read" aria-live="polite"><div><b id="d-num">0</b> lb</div><div class="state open" id="d-state">Open</div></div>
+        <div class="sd-read" aria-live="polite"><div><b id="d-num">0</b> lb added</div><div class="state open" id="d-state">Open</div></div>
       </div>
       <div class="gauge" id="d-gauge" role="img" aria-label="Weight on the seat compared to the ${T} pound line"><i id="d-fill" style="width:0"></i><u style="left:${(T / MAX) * 100}%"><span>${T} lb line</span></u></div>
       <div class="btnrow">
@@ -171,22 +171,55 @@
   }
 
   function demoPads(el) {
-    const modes = {
-      pack: { feet: [7, 6, 6, 6], msg: 'A backpack on the seat adds a little to each foot. The total stays under the line, so the chair reads open.' },
-      sit: { feet: [31, 38, 29, 33], msg: 'A person loads all four feet. The total is well over the line, so after the delay the chair reads taken. Even a lopsided lean adds up to plenty.' }
-    };
-    el.innerHTML = `<div class="demo"><div class="padrow" id="pr"></div>
+    // Illustration only. The smart foot feels part of the load, so its line sits at about a quarter of the full-seat line.
+    const LINE = 12, EMPTY = { light: 3, heavy: 10 }, ADD = { pack: 6, sit: 18 };
+    const st = { chair: 'light', load: 'pack' };
+    el.innerHTML = `<div class="demo"><div class="seg" id="pd-chair" role="group" aria-label="Chair type">
+        <button data-c="light">Light, 10 lb</button><button data-c="heavy">Heavy, 40 lb</button></div>
+      <div class="padrow" style="grid-template-columns:repeat(3,1fr)" id="pr"></div>
       <div class="state-line" style="margin-bottom:8px"><b id="pr-tot"></b></div>
       <div class="btnrow" style="margin-top:0"><button class="btn ghost" data-m="pack">Backpack on seat</button><button class="btn ghost" data-m="sit">Person sits</button></div>
       <p class="hint" id="pr-msg"></p></div>`;
-    const draw = (k) => {
-      const m = modes[k], tot = m.feet.reduce((a, b) => a + b, 0);
-      el.querySelector('#pr').innerHTML = m.feet.map((v, i) => `<div><small>Foot ${i + 1}</small><b>${v}</b></div>`).join('');
-      el.querySelector('#pr-tot').textContent = `Total ${tot} lb: ` + (tot >= VS.THRESHOLD ? 'counts as taken' : 'stays open') + ` (line is ${VS.THRESHOLD} lb)`;
-      el.querySelector('#pr-msg').textContent = m.msg;
+    const draw = () => {
+      const e = EMPTY[st.chair], a = ADD[st.load], now = e + a, taken = a >= LINE;
+      el.querySelector('#pr').innerHTML = `<div><small>Empty chair</small><b>${e} lb</b></div><div><small>Now</small><b>${now} lb</b></div><div><small>Added</small><b>${a} lb</b></div>`;
+      el.querySelector('#pr-tot').textContent = `Added ${a} lb vs a line of ${LINE} lb: ` + (taken ? 'counts as taken' : 'stays open');
+      el.querySelector('#pr-msg').textContent = st.load === 'pack'
+        ? 'A bag adds a little. It stays under the line on either chair, because only the added weight counts.'
+        : 'A person adds a lot. The light and the heavy chair both read taken after the delay, because the chair\'s own weight is subtracted.';
+      el.querySelectorAll('[data-c]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === st.chair)));
     };
-    draw('pack');
-    el.querySelector('.btnrow').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) draw(b.dataset.m); });
+    draw();
+    el.addEventListener('click', (e) => {
+      const m = e.target.closest('[data-m]'), c = e.target.closest('[data-c]');
+      if (m) st.load = m.dataset.m;
+      if (c) st.chair = c.dataset.c;
+      if (m || c) draw();
+    });
+  }
+
+  function demoBooth(el) {
+    const t = { n: 'K1', r: 1, c: 2, sd: 'ns', bk: 1, bs: { st: 'o', at: Date.now() } };
+    el.innerHTML = `<div class="demo mini"><div class="mt"><div class="mt-h"><b>Booth K1</b><span data-w></span></div><div class="tb" data-b style="${VS.tbStyle(t)}"></div></div>
+      <div class="btnrow"><button class="btn ghost" data-k="o">Mark open</button><button class="btn ghost" data-k="t">Mark taken</button></div>
+      <div class="btnrow" style="margin-top:8px"><button class="btn ghost" data-k="skip">Skip ahead 2 hours</button></div>
+      <p class="hint" data-h></p></div>`;
+    const draw = () => {
+      const st = VS.bState(t);
+      el.querySelector('[data-b]').innerHTML = VS.tbHTML(t, []);
+      el.querySelector('[data-w]').textContent = ({ o: 'Open', t: 'Taken', u: 'Unknown' })[st];
+      el.querySelector('[data-h]').textContent = st === 'u'
+        ? 'Nobody updated it for 2 hours, so it shows unknown instead of staying wrong.'
+        : 'Staff tap it by hand. Dashed bars mean a person set it, not a sensor.';
+    };
+    draw();
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-k]');
+      if (!b) return;
+      if (b.dataset.k === 'skip') t.bs.at = Date.now() - (VS.BOOTH_HOURS * 3600e3 + 60e3);
+      else t.bs = { st: b.dataset.k, at: Date.now() };
+      draw();
+    });
   }
 
   function demoRoles(el) {
@@ -198,14 +231,14 @@
   }
 
   function demoBuild(el) {
-    el.innerHTML = `<div class="demo"><div class="list">${VS.PRESETS.map((p) => `<div><b>${VS.esc(p.name)}</b><span>${VS.chairsText(VS.chairs(p))}</span></div>`).join('')}</div>
+    el.innerHTML = `<div class="demo"><div class="list">${VS.PRESETS.map((p) => `<div><b>${VS.esc(p.name)}</b><span>${p.bk ? 'set by hand' : VS.chairsText(VS.chairs(p))}</span></div>`).join('')}</div>
       <p class="hint">Change the size and which sides have chairs, then tap the grid to place it. Your draft saves as you go. Press Publish when it is ready for visitors.</p></div>`;
   }
 
   /* ---------- steps ---------- */
 
   const userSteps = [
-    { title: 'Every seat reports on its own', body: 'A thin pad replaces each foot of the chair and measures the weight coming down through it. It works on cushion, wood or metal chairs. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
+    { title: 'Every seat reports on its own', body: 'One smart foot replaces a foot on the chair and measures the weight added above the empty chair, so light and heavy chairs behave the same. It works on any chair with feet. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
     { title: 'Tables are counted in seats', body: 'A 1x8 is one seat wide and eight long, with chairs down both long sides and on both ends: 18 in all. A bar has chairs on one side only.', demo: demoGroups },
     { title: 'Move a chair and the count follows', body: 'Chairs get dragged between tables all day, most of all in study spots. Nobody scans or types. A chair counts for whichever table puck it hears loudest, so a group table updates itself.', demo: demoMove },
     { title: 'Public: anyone can look', body: 'Colleges and cafes can open their seating to everyone. Search a place, save it to My locations, and check its floor before you walk over. Only the venue can change the floor plan.', demo: demoPublic },
@@ -215,7 +248,8 @@
 
   const bizSteps = [
     { title: 'Stick a puck under each table', body: 'One small puck goes under each table top. Scan its code once and the table lands on your floor plan. Chairs find the nearest puck on their own, so they can move.', demo: demoSticker },
-    { title: 'Swap the chair feet', body: 'The pads replace the feet on the chairs you already own. No tools beyond pulling the old feet off. One plug-in gateway per room does the rest.', demo: demoPads },
+    { title: 'Swap the chair feet', body: 'Each chair gets a set of four feet: one smart foot and three plain ones at the same height, so it sits level. One plug-in gateway per room does the rest.', demo: demoPads },
+    { title: 'Booths are set by hand', body: 'Fixed booths have no feet, so there is no sensor to swap in. Staff tap a booth to mark it open or taken. It shows as set by staff with a time, and goes back to unknown after 2 hours without an update.', demo: demoBooth },
     { title: 'Who does what', body: 'Staff run the floor. Visitors only look. At a college, students can see the floor but only the college can change it.', demo: demoRoles },
     { title: 'You choose who sees it', body: 'Open it to everyone or keep it for staff behind a PIN. In this demo the PIN is 1234 and the phone checks it. In the real product Vacantseat\'s server checks it, and a published floor shows on every device, not just yours.', demo: demoAccess },
     { title: 'Build and publish your floor', body: 'Pick a table type, adjust it, and place it on a grid that matches your room. Publish when it is ready.', demo: demoBuild, last: 'Open the builder' }

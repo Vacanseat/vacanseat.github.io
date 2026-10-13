@@ -62,6 +62,11 @@
 
   /* ---------- place ---------- */
 
+  function bkLine(p) {
+    const b = VS.boothCounts(p);
+    return b.total ? `<p class="bksum" id="bk-sum">Booths, set by staff: <b>${b.open}</b> open, <b>${b.taken}</b> taken${b.unknown ? `, <b>${b.unknown}</b> unknown` : ''}</p>` : '';
+  }
+
   function renderPlace(p, staff) {
     const c = VS.counts(p);
     view.innerHTML = `
@@ -73,10 +78,11 @@
       <div class="wrap">
         ${staff ? '<div class="banner">Staff view. You unlocked this with the PIN. Visitors see a locked card.</div>' : ''}
         <div class="sum"><div class="o"><strong id="nOpen">${c.open}</strong>open</div><div class="t"><strong id="nTaken">${c.taken}</strong>taken</div><span class="live"><i></i>Live, simulated</span></div>
+        ${bkLine(p)}
         <button class="btn ghost block savebtn" data-save="${p.id}" aria-pressed="${isSaved(p.id)}">${isSaved(p.id) ? 'Saved to My locations' : 'Save to My locations'}</button>
-        <div class="details"><div><span>Hours</span><b>${VS.esc(p.hours)}</b></div><div><span>Setup</span><b>${p.tables.length} tables, ${c.total} chairs</b></div><div><span>Access</span><b>${p.mode === 'public' ? 'Public' : 'Private, PIN'}</b></div></div>
+        <div class="details"><div><span>Hours</span><b>${VS.esc(p.hours)}</b></div><div><span>Setup</span><b>${p.tables.filter((t) => !t.bk).length} tables, ${c.total} chairs${p.tables.some((t) => t.bk) ? ', ' + p.tables.filter((t) => t.bk).length + ' booths' : ''}</b></div><div><span>Access</span><b>${p.mode === 'public' ? 'Public' : 'Private, PIN'}</b></div></div>
         <p class="managed">${/college/i.test(p.kind) ? 'Managed by college staff. Students can view the floor but cannot change it.' : 'Managed by the venue. Visitors can view the floor but cannot change it.'}</p>
-        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table puck</span></div>
+        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table puck</span>${p.tables.some((t) => t.bk) ? '<span><i class="bench open"></i>Booth, set by staff</span>' : ''}</div>
         <div class="floor" id="floor">${p.tables.map((t, ti) => VS.tableBtn(t, ti, t.seats, 'button')).join('')}</div>
         <div class="lvl"><p>Demo controls. Change how busy the room is.</p>
           <div class="seg" role="group" aria-label="Room busyness">
@@ -105,8 +111,16 @@
     const no = $('#nOpen'), nt = $('#nTaken');
     if (no) no.textContent = c.open;
     if (nt) nt.textContent = c.taken;
+    const bk = $('#bk-sum');
+    if (bk) bk.outerHTML = bkLine(p);
     $$('#floor .tbl').forEach((el) => {
       const t = p.tables[+el.dataset.t];
+      if (t.bk) {
+        const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
+        $$('.bench', el).forEach((b) => { b.className = 'bench ' + cls; });
+        el.setAttribute('aria-label', `Booth ${t.n}, set by staff, ${{ o: 'open', t: 'taken', u: 'unknown' }[st]}`);
+        return;
+      }
       $$('.seat', el).forEach((el2) => {
         const s = t.seats[+el2.dataset.s];
         const occ = VS.isOcc(s);
@@ -151,13 +165,28 @@
       <div class="sh-head"><div><h2>Table ${VS.esc(t.n)}</h2><p class="sub">${size}, ${tc.total} chair${tc.total > 1 ? 's' : ''}</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
       <p class="sh-big"><strong>${tc.open}</strong>of ${tc.total} open</p>
       <div class="sgrid">${t.seats.map((s, i) => `<div class="cell"><span class="seat ${VS.seatCls(s)}"></span><small>${s.lb}<span class="sr"> pounds, chair ${i + 1}, ${VS.isOcc(s) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
-      <p class="note">Numbers are pounds on each chair. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The puck under this table adds the chairs up.</p>`;
+      <p class="note">Numbers are pounds added above the empty chair, so a light chair and a heavy chair behave the same. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The puck under this table adds the chairs up.</p>`;
   }
+
+  function boothSheetHTML(p, t) {
+    const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
+    const word = { o: 'Open', t: 'Taken', u: 'Unknown' }[st];
+    const when = st === 'u' ? `Nobody has updated this booth for over ${VS.BOOTH_HOURS} hours, so it shows unknown.` : `Set by staff ${VS.ago(t.bs.at)}`;
+    const ctl = VS.admin
+      ? `<div class="btnrow"><button class="btn ghost" data-bset="o">Mark open</button><button class="btn" data-bset="t">Mark taken</button></div>`
+      : '<p class="note">Only venue staff can change a booth. Sign in from Set up your floor to try it.</p>';
+    return `<div class="grab"></div>
+      <div class="sh-head"><div><h2>Booth ${VS.esc(t.n)}</h2><p class="sub">Set by staff, not by a sensor</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
+      <p class="bigstate ${cls}">${word}</p><p class="when">${when}</p>${ctl}
+      <p class="note">Fixed booths have no feet to put a sensor in, so staff tap them by hand. A booth with no update for ${VS.BOOTH_HOURS} hours goes back to unknown, about the length of a meal.</p>`;
+  }
+
+  const sheetHTML = (p, t) => (t.bk ? boothSheetHTML(p, t) : tableSheetHTML(p, t));
 
   function openTable(ti) {
     const p = current.p, t = p.tables[ti];
     sheetCtx = { p, ti };
-    showSheet(tableSheetHTML(p, t));
+    showSheet(sheetHTML(p, t));
   }
 
   function openLocked(id) {
@@ -258,6 +287,14 @@
     if ((el = t.closest('[data-staff]'))) return staffGo(el.dataset.staff);
     if (t.closest('[data-gate-go]')) return gateGo();
     if (t.closest('[data-home]')) { location.hash = '#/'; return; }
+    if ((el = t.closest('[data-bset]'))) {
+      if (!VS.admin || !sheetCtx) return;
+      const bt = sheetCtx.p.tables[sheetCtx.ti];
+      bt.bs = { st: el.dataset.bset, at: Date.now() };
+      $('.panel', sheet).innerHTML = sheetHTML(sheetCtx.p, bt);
+      paint(sheetCtx.p, true);
+      return;
+    }
     if ((el = t.closest('[data-save]'))) {
       const on = toggleSaved(el.dataset.save);
       el.setAttribute('aria-pressed', String(on));
@@ -301,7 +338,7 @@
         const t = sheetCtx.p.tables[sheetCtx.ti];
         const panel = $('.panel', sheet);
         const y = panel.scrollTop;
-        panel.innerHTML = tableSheetHTML(sheetCtx.p, t);
+        panel.innerHTML = sheetHTML(sheetCtx.p, t);
         panel.scrollTop = y;
       }
     } else if (current.type === 'list') {
