@@ -5,46 +5,14 @@
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
   const view = $('#view');
   const sheet = $('#sheet');
-  const rnd = (a, b) => a + Math.random() * (b - a);
 
   const state = { q: '', filter: 'all' };
   let current = { type: 'list' };
   let sheetCtx = null;
   let listScroll = 0;
   let fromList = false;
-  let ro = null;
 
-  /* ---------- simulated sensors ---------- */
-
-  // Occupied reads 105 to 235 lb. A bag now and then reads 14 to 38 lb, so it stays open.
-  const reading = (occ) => (occ ? Math.round(rnd(105, 235)) : Math.random() < 0.1 ? Math.round(rnd(14, 38)) : 0);
-
-  function seed(p) {
-    p.base = p.busy;
-    p.tables = p.t.map(([label, x, y, rows, cols]) => ({
-      label, x, y, rows, cols,
-      seats: Array.from({ length: rows * cols }, () => reading(Math.random() < p.busy))
-    }));
-  }
-
-  function reroll(p, busy) {
-    p.busy = busy;
-    p.tables.forEach((t) => { t.seats = t.seats.map(() => reading(Math.random() < busy)); });
-  }
-
-  function tick() {
-    VS.PLACES.forEach((p) => {
-      const arrive = 0.05 * p.busy, leave = 0.05 * (1 - p.busy);
-      p.tables.forEach((t) => {
-        t.seats = t.seats.map((lb) => {
-          const occ = VS.isOcc(lb);
-          if (occ && Math.random() < leave) return reading(false);
-          if (!occ && Math.random() < arrive) return reading(true);
-          return lb;
-        });
-      });
-    });
-  }
+  const setCur = (c) => { current = c; VS.cur = c.type; };
 
   /* ---------- list ---------- */
 
@@ -58,6 +26,7 @@
           ${['all', 'public', 'private'].map((f) => `<button data-filter="${f}" aria-pressed="${state.filter === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join('')}
         </div>
         <div id="cards"></div>
+        <div class="biz"><h3>Run a library, cafe or restaurant?</h3><p>See how a business sets up its floor, then build one yourself.</p><button class="btn block" data-biz>Set up your floor</button></div>
         <p class="foot">Demo data. Sensor readings are simulated for this class project.</p>
       </div>`;
     drawCards();
@@ -67,7 +36,8 @@
   function drawCards() {
     const q = state.q.trim().toLowerCase();
     const items = VS.PLACES.filter((p) => (state.filter === 'all' || p.mode === state.filter) && (!q || (p.name + ' ' + p.kind).toLowerCase().includes(q)));
-    items.sort((a, b) => (a.mode !== b.mode ? (a.mode === 'public' ? -1 : 1) : a.mode === 'public' ? VS.counts(b).open - VS.counts(a).open : a.name.localeCompare(b.name)));
+    const rank = (p) => (p.id === 'custom' ? 0 : p.mode === 'public' ? 1 : 2);
+    items.sort((a, b) => rank(a) - rank(b) || (a.mode === 'public' ? VS.counts(b).open - VS.counts(a).open : a.name.localeCompare(b.name)));
     $('#cards').innerHTML = items.length
       ? items.map((p) => VS.cardHTML(p)).join('')
       : '<p class="sub" style="padding:18px 4px">No places match. Try a building or a cafe name.</p>';
@@ -79,7 +49,7 @@
     const c = VS.counts(p);
     view.innerHTML = `
       <header class="bar">
-        <button class="iconbtn" data-back aria-label="Back to places">${VS.I.back}</button>
+        <button class="iconbtn" data-back aria-label="Back">${VS.I.back}</button>
         <div class="bar-title"><h1>${VS.esc(p.name)}</h1><p>${VS.esc(p.kind)}, ${VS.esc(p.hours)}</p></div>
         <span class="tag ${staff ? 'staff' : 'pub'}">${staff ? 'Staff view' : 'Public'}</span>
       </header>
@@ -87,32 +57,26 @@
         ${staff ? '<div class="banner">Staff preview. Visitors only see a locked card for this place.</div>' : ''}
         <div class="sum"><div class="o"><strong id="nOpen">${c.open}</strong>open</div><div class="t"><strong id="nTaken">${c.taken}</strong>taken</div><span class="live"><i></i>Live, simulated</span></div>
         <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table hub</span></div>
-        <div class="floor" id="floor">
-          ${p.tables.map((t, ti) => `<button class="tbl" data-t="${ti}" style="left:calc(var(--u)*${t.x});top:calc(var(--u)*${t.y});grid-template-columns:repeat(${t.cols},calc(var(--u)*6))">
-            ${t.seats.map((lb, si) => `<span class="seat ${VS.isOcc(lb) ? 'occ' : 'open'}" data-s="${si}"></span>`).join('')}<i class="hub"></i>
-            <span class="tlabel"><b>${VS.esc(t.label)}</b>${t.seats.length > 1 ? '<em data-tc></em>' : ''}</span></button>`).join('')}
-        </div>
+        <div class="floor" id="floor">${p.tables.map((t, ti) => VS.tableBtn(t, ti, t.seats, 'button')).join('')}</div>
         <div class="lvl"><p>Demo controls. Change how busy the room is.</p>
           <div class="seg" role="group" aria-label="Room busyness">
             ${[['Quiet', 0.2], ['Steady', p.base], ['Packed', 0.93]].map(([n, v]) => `<button data-level="${v}" aria-pressed="${Math.abs(p.busy - v) < 0.01}">${n}</button>`).join('')}
           </div>
         </div>
-        <p class="foot">Demo data. Tap a table to see each seat's reading.</p>
+        ${p.id === 'custom' ? '<div class="btnrow"><button class="btn ghost" data-edit>Edit floor</button></div>' : ''}
+        <p class="foot">Demo data. Tap a table to see each chair's reading.</p>
       </div>`;
     fit();
     paint(p, false);
   }
 
   function fit() {
-    const floor = $('#floor');
-    if (!floor || current.type !== 'place') return;
-    const u = floor.clientWidth / 100;
-    floor.style.setProperty('--u', u + 'px');
-    floor.style.height = current.p.h * u + 'px';
+    if (current.type === 'place') VS.fitFloor($('#floor'), VS.heightOf(current.p.t));
+    else if (current.type === 'setup') VS.setup.fit();
   }
 
   function tableCounts(t) {
-    const open = t.seats.filter((lb) => !VS.isOcc(lb)).length;
+    const open = t.seats.filter((s) => !VS.isOcc(s)).length;
     return { open, total: t.seats.length };
   }
 
@@ -123,18 +87,20 @@
     if (nt) nt.textContent = c.taken;
     $$('#floor .tbl').forEach((el) => {
       const t = p.tables[+el.dataset.t];
-      $$('.seat', el).forEach((s, i) => {
-        const occ = VS.isOcc(t.seats[i]);
-        if (occ !== s.classList.contains('occ')) {
-          s.classList.toggle('occ', occ);
-          s.classList.toggle('open', !occ);
-          if (animate) { s.classList.remove('flip'); void s.offsetWidth; s.classList.add('flip'); }
+      $$('.seat', el).forEach((el2) => {
+        const s = t.seats[+el2.dataset.s];
+        const occ = VS.isOcc(s);
+        if (occ !== el2.classList.contains('occ')) {
+          el2.classList.toggle('occ', occ);
+          el2.classList.toggle('open', !occ);
+          if (animate) { el2.classList.remove('flip'); void el2.offsetWidth; el2.classList.add('flip'); }
         }
+        el2.classList.toggle('pending', VS.pending(s));
       });
       const tc = tableCounts(t);
       const em = $('[data-tc]', el);
       if (em) em.textContent = tc.open + ' open';
-      el.setAttribute('aria-label', `Table ${t.label}, ${t.rows}x${t.cols}, ${tc.open} of ${tc.total} seats open`);
+      el.setAttribute('aria-label', `Table ${t.n}, ${t.r}x${t.c}, ${tc.open} of ${tc.total} seats open`);
     });
   }
 
@@ -160,11 +126,12 @@
 
   function tableSheetHTML(p, t) {
     const tc = tableCounts(t);
+    const size = t.r === 0 ? VS.sidesText(t) : `${t.r}x${t.c}, ${VS.sidesText(t)}`;
     return `<div class="grab"></div>
-      <div class="sh-head"><div><h2>Table ${VS.esc(t.label)}</h2><p class="sub">${t.rows}x${t.cols}, ${tc.total} seat${tc.total > 1 ? 's' : ''}</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
+      <div class="sh-head"><div><h2>Table ${VS.esc(t.n)}</h2><p class="sub">${size}, ${tc.total} chair${tc.total > 1 ? 's' : ''}</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
       <p class="sh-big"><strong>${tc.open}</strong>of ${tc.total} open</p>
-      <div class="sgrid">${t.seats.map((lb, i) => `<div class="cell"><span class="seat ${VS.isOcc(lb) ? 'occ' : 'open'}"></span><small>${lb}<span class="sr"> pounds, seat ${i + 1}, ${VS.isOcc(lb) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
-      <p class="note">Numbers are pounds on each seat. ${VS.THRESHOLD} lb or more counts as taken, so a backpack reads open. The hub under this table adds the seats up.</p>`;
+      <div class="sgrid">${t.seats.map((s, i) => `<div class="cell"><span class="seat ${VS.seatCls(s)}"></span><small>${s.lb}<span class="sr"> pounds, chair ${i + 1}, ${VS.isOcc(s) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
+      <p class="note">Numbers are pounds on each chair. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The hub in the middle of this table adds the chairs up.</p>`;
   }
 
   function openTable(ti) {
@@ -185,19 +152,27 @@
   /* ---------- routing ---------- */
 
   function route() {
-    const m = (location.hash || '#/').match(/^#\/p\/([\w-]+)(\?staff)?$/);
+    const hash = location.hash || '#/';
     closeSheet();
     if (current.type === 'list') listScroll = window.scrollY;
+    if (hash === '#/setup') {
+      setCur({ type: 'setup' });
+      VS.setup.render(view);
+      VS.setup.fit();
+      window.scrollTo(0, 0);
+      return;
+    }
+    const m = hash.match(/^#\/p\/([\w-]+)(\?staff)?$/);
     if (m) {
       const p = VS.PLACES.find((x) => x.id === m[1]);
       if (p && (p.mode === 'public' || m[2])) {
-        current = { type: 'place', p, staff: !!m[2] };
+        setCur({ type: 'place', p, staff: !!m[2] });
         renderPlace(p, !!m[2]);
         window.scrollTo(0, 0);
         return;
       }
     }
-    current = { type: 'list' };
+    setCur({ type: 'list' });
     renderList();
   }
 
@@ -207,19 +182,21 @@
     const t = e.target;
     let el;
     if ((el = t.closest('[data-close]'))) return closeSheet();
-    if ((el = t.closest('[data-help]'))) return VS.tutorial.open();
+    if ((el = t.closest('[data-help]'))) return VS.tutorial.open('user');
+    if ((el = t.closest('[data-biz]'))) { fromList = true; return VS.tutorial.open('provider'); }
+    if ((el = t.closest('[data-edit]'))) { fromList = false; location.hash = '#/setup'; return; }
     if ((el = t.closest('[data-go]'))) { fromList = true; location.hash = '#/p/' + el.dataset.go; return; }
     if ((el = t.closest('[data-lock]'))) return openLocked(el.dataset.lock);
     if ((el = t.closest('[data-staff]'))) { closeSheet(); fromList = true; location.hash = '#/p/' + el.dataset.staff + '?staff'; return; }
     if ((el = t.closest('[data-back]'))) { if (fromList) history.back(); else location.hash = '#/'; fromList = false; return; }
     if ((el = t.closest('[data-filter]'))) { state.filter = el.dataset.filter; $$('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', String(b === el))); return drawCards(); }
     if ((el = t.closest('[data-level]'))) {
-      reroll(current.p, +el.dataset.level);
+      VS.rerollPlace(current.p, +el.dataset.level);
       $$('[data-level]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
       paint(current.p, true);
       return;
     }
-    if ((el = t.closest('#floor .tbl'))) return openTable(+el.dataset.t);
+    if (current.type === 'place' && (el = t.closest('#floor .tbl'))) return openTable(+el.dataset.t);
   });
 
   document.addEventListener('input', (e) => {
@@ -237,7 +214,7 @@
   /* ---------- live loop ---------- */
 
   function loop() {
-    tick();
+    VS.tickPlaces(VS.PLACES);
     if (current.type === 'place') {
       paint(current.p, true);
       if (sheetCtx) {
@@ -247,20 +224,21 @@
         panel.innerHTML = tableSheetHTML(sheetCtx.p, t);
         panel.scrollTop = y;
       }
-    } else {
+    } else if (current.type === 'list') {
       VS.updateCards(document);
     }
     VS.updateCards($('#tutorial'));
   }
   let timer = null;
-  const start = () => { if (!timer) timer = setInterval(loop, 2600); };
+  const start = () => { if (!timer) timer = setInterval(loop, VS.TICK_SECS * 1000); };
   const stop = () => { clearInterval(timer); timer = null; };
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
 
   /* ---------- boot ---------- */
 
-  VS.PLACES.forEach(seed);
+  VS.PLACES.forEach(VS.seedPlace);
+  VS.setup.publish();
   route();
   start();
-  if (!VS.tutorial.seen()) VS.tutorial.open();
+  if (!VS.tutorial.seen()) VS.tutorial.open('user');
 })();

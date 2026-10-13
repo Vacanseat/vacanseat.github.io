@@ -32,19 +32,18 @@
 .gauge u { position: absolute; top: -7px; bottom: -7px; width: 2px; background: var(--text); text-decoration: none; }
 .gauge u span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; font-size: 12px; white-space: nowrap; color: var(--muted); }
 .seatdemo .btnrow .btn { padding: 0 8px; min-height: 48px; font-size: 15px; }
-.why { margin-top: 14px; font-size: 15px; color: #C9D4F0; min-height: 44px; }
+.timer { margin-top: 12px; min-height: 20px; font-size: 14px; color: var(--warn); font-variant-numeric: tabular-nums; }
+.why { margin-top: 6px; font-size: 15px; color: #C9D4F0; min-height: 66px; }
 
-/* step 2 and 3 */
-.mt { margin-bottom: 18px; }
+/* steps 2 and 3 */
+.mt { margin-bottom: 20px; overflow-x: auto; }
 .mt:last-of-type { margin-bottom: 0; }
-.mt-h { display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
+.mt-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; font-size: 14px; color: var(--muted); }
 .mt-h b { color: var(--text); font-size: 16px; }
-.mini { --u: 4.6px; }
+.mini { --u: 3.6px; }
 .mini .seat { cursor: pointer; }
-.mini .seat::before { content: ''; position: absolute; inset: -8px; }
-.mini .plate { margin-top: 4px; }
-.flexy { display: flex; flex-wrap: wrap; max-width: calc(var(--u) * 32); }
-.pair { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-start; }
+.mini .seat::before { content: ''; position: absolute; inset: -6px; }
+.pair { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
 .arrive { animation: flip 0.7s ease; }
 
 /* step 4 */
@@ -58,5 +57,12 @@
 /* step 6 */
 .key { display: grid; gap: 14px; }
 .key div { display: flex; gap: 14px; align-items: center; font-size: 16px; }
-.key .seat, .key .hub { --u: 5px; }
+.key .seat { --u: 5px; }
 .key .hub { position: static; margin: 0 6px 0 4px; }
+
+/* business tutorial */
+.list { display: grid; gap: 10px; }
+.list div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface2); font-size: 15px; }
+.list b { font-weight: 600; }
+.list span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.demo .seg { margin: 0 0 14px; }

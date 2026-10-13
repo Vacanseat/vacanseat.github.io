@@ -1,63 +1,83 @@
 window.VS = window.VS || {};
 
-// One number to change if the class pushes back on 100 lb.
-VS.THRESHOLD = 100;
+// Sensing rule. A seat reads taken after THRESHOLD lb is held for TAKE_SECS.
+// It reads open again after less than THRESHOLD lb is held for FREE_SECS.
+// A loaded backpack runs about 15 to 30 lb. A seated person puts roughly 60 to 80 percent
+// of their body weight on the seat, so a 100 lb person reads around 60 to 80 lb.
+VS.THRESHOLD = 50;
+VS.TAKE_SECS = 10;
+VS.FREE_SECS = 60;
+VS.TICK_SECS = 2.6;
 
-// Tables: [label, x, y, rows, cols]. x and y are in floor units (the floor is 100 units wide).
-// "1x8" means 1 row of 8 seats. Seat = 7 units with gap, so a table is (cols*7+2) wide, (rows*7+2) tall.
-VS.PLACES = [
-  {
-    id: 'clough-l2', name: 'Clough Commons, Level 2', kind: 'College library',
-    mode: 'public', hours: 'Open until 2 AM', busy: 0.62, h: 128,
-    t: [
-      ['A1', 5, 8, 1, 8], ['A2', 72, 8, 2, 2],
-      ['B1', 5, 32, 2, 4], ['B2', 42, 32, 2, 4], ['B3', 80, 32, 1, 2],
-      ['C1', 5, 60, 2, 2], ['C2', 28, 60, 2, 2], ['C3', 51, 60, 2, 2], ['C4', 74, 60, 1, 1],
-      ['D1', 5, 88, 1, 6], ['L1', 58, 88, 1, 1], ['L2', 70, 88, 1, 1], ['L3', 82, 88, 1, 1],
-      ['E1', 5, 106, 2, 3], ['E2', 36, 106, 2, 3], ['E3', 67, 106, 1, 4]
-    ]
-  },
-  {
-    id: 'price-gilbert-3', name: 'Price Gilbert Library, 3rd Floor', kind: 'College library',
-    mode: 'public', hours: 'Open until midnight', busy: 0.78, h: 124,
-    t: [
-      ['R1', 5, 8, 1, 10], ['R2', 5, 26, 1, 10],
-      ['Q1', 5, 46, 2, 4], ['Q2', 42, 46, 2, 4], ['Q3', 80, 46, 2, 2],
-      ['K1', 5, 72, 1, 1], ['K2', 17, 72, 1, 1], ['K3', 29, 72, 1, 1], ['K4', 41, 72, 1, 1],
-      ['K5', 53, 72, 1, 1], ['K6', 65, 72, 1, 1], ['K7', 77, 72, 1, 1], ['K8', 89, 72, 1, 1],
-      ['K9', 5, 88, 1, 1], ['K10', 17, 88, 1, 1], ['K11', 29, 88, 1, 1], ['K12', 41, 88, 1, 1],
-      ['K13', 53, 88, 1, 1], ['K14', 65, 88, 1, 1], ['K15', 77, 88, 1, 1], ['K16', 89, 88, 1, 1],
-      ['S1', 5, 106, 2, 2], ['S2', 28, 106, 2, 2], ['S3', 51, 106, 1, 6]
-    ]
-  },
-  {
-    id: 'starbucks', name: 'Starbucks', kind: 'Cafe',
-    mode: 'public', hours: 'Closes at 9 PM', busy: 0.55, h: 100,
-    t: [
-      ['W1', 5, 8, 1, 9],
-      ['T1', 5, 28, 1, 2], ['T2', 28, 28, 1, 2], ['T3', 51, 28, 1, 2], ['T4', 74, 28, 1, 2],
-      ['T5', 5, 50, 2, 2], ['T6', 28, 50, 2, 2], ['T7', 51, 50, 2, 2], ['T8', 74, 50, 1, 1],
-      ['C1', 5, 76, 1, 1], ['C2', 17, 76, 1, 1], ['C3', 29, 76, 1, 1], ['S1', 48, 76, 2, 3]
-    ]
-  },
-  {
-    id: 'chilis', name: "Chili's", kind: 'Restaurant',
-    mode: 'private', hours: 'Open until 11 PM', busy: 0.7, h: 100,
-    t: [
-      ['B1', 5, 8, 1, 4], ['B2', 42, 8, 1, 4], ['B3', 79, 8, 1, 2],
-      ['T1', 5, 30, 2, 2], ['T2', 28, 30, 2, 2], ['T3', 51, 30, 2, 2], ['T4', 74, 30, 2, 2],
-      ['T5', 5, 56, 2, 3], ['T6', 36, 56, 2, 3], ['T7', 67, 56, 2, 3],
-      ['BAR', 5, 82, 1, 10]
-    ]
-  },
-  {
-    id: 'texas-roadhouse', name: 'Texas Roadhouse', kind: 'Restaurant',
-    mode: 'private', hours: 'Open until 10 PM', busy: 0.85, h: 100,
-    t: [
-      ['H1', 5, 8, 1, 6], ['H2', 56, 8, 1, 5],
-      ['A1', 5, 28, 2, 4], ['A2', 42, 28, 2, 4], ['A3', 79, 28, 2, 2],
-      ['B1', 5, 54, 2, 4], ['B2', 42, 54, 2, 4], ['B3', 79, 54, 2, 2],
-      ['C1', 5, 80, 1, 10]
-    ]
-  }
-];
+// The floor is COLS seat widths across. x and y are in seat widths from the top left.
+// A table is r x c seats (its top). sd lists which sides have chairs: n, e, s, w.
+// A 1x8 with sd 'nsew' is one seat wide, eight long, with chairs down both long sides
+// and on both ends: 8 + 8 + 1 + 1 = 18. A bar is 'n' or 's' only. r = 0 is a lone
+// chair or sofa with no top.
+VS.COLS = 14;
+VS.PAD = 0.5; // empty margin around the floor, in seat widths
+
+(function () {
+  const T = (n, x, y, r, c, sd) => ({ n, x, y, r, c, sd });
+
+  VS.PLACES = [
+    {
+      id: 'clough-l2', name: 'Clough Commons, Level 2', kind: 'College library',
+      mode: 'public', hours: 'Open until 2 AM', busy: 0.62,
+      t: [
+        T('A1', 0, 0, 1, 8, 'nsew'), T('A2', 11, 0, 1, 1, 'nsew'),
+        T('B1', 0, 4, 2, 4, 'nsew'), T('B2', 7, 4, 2, 3, 'nsew'), T('B3', 13, 4, 1, 1, 'ns'),
+        T('C1', 0, 9, 1, 1, 'n'), T('C2', 2, 9, 1, 1, 'n'), T('C3', 4, 9, 1, 1, 'n'),
+        T('C4', 6, 9, 1, 1, 'n'), T('C5', 8, 9, 1, 1, 'n'),
+        T('L1', 11, 9, 0, 1, 'n'), T('L2', 12, 9, 0, 1, 'n'), T('L3', 13, 9, 0, 1, 'n'),
+        T('D1', 0, 12, 1, 6, 's'), T('D2', 7, 12, 2, 2, 'nsew'), T('E1', 12, 12, 1, 1, 'ns')
+      ]
+    },
+    {
+      id: 'price-gilbert-3', name: 'Price Gilbert Library, 3rd Floor', kind: 'College library',
+      mode: 'public', hours: 'Open until midnight', busy: 0.78,
+      t: [
+        T('R1', 0, 0, 1, 10, 'ns'), T('S1', 11, 0, 3, 1, 'we'),
+        T('R2', 0, 4, 1, 10, 'ns'), T('S2', 11, 4, 3, 1, 'we'),
+        T('Q1', 0, 8, 2, 4, 'nsew'), T('Q2', 7, 8, 2, 4, 'nsew'),
+        T('K1', 0, 13, 1, 1, 'n'), T('K2', 2, 13, 1, 1, 'n'), T('K3', 4, 13, 1, 1, 'n'),
+        T('K4', 6, 13, 1, 1, 'n'), T('K5', 8, 13, 1, 1, 'n'), T('K6', 10, 13, 1, 1, 'n'),
+        T('K7', 12, 13, 1, 1, 'n'),
+        T('B1', 0, 16, 1, 6, 's'), T('G1', 7, 16, 2, 2, 'nsew')
+      ]
+    },
+    {
+      id: 'starbucks', name: 'Starbucks', kind: 'Cafe',
+      mode: 'public', hours: 'Closes at 9 PM', busy: 0.55,
+      t: [
+        T('W1', 0, 0, 1, 9, 'n'), T('L1', 10, 0, 0, 1, 'n'), T('L2', 11, 0, 0, 1, 'n'), T('L3', 12, 0, 0, 1, 'n'),
+        T('T1', 0, 3, 1, 1, 'ns'), T('T2', 2, 3, 1, 1, 'ns'), T('T3', 4, 3, 1, 1, 'ns'), T('T4', 6, 3, 1, 1, 'ns'),
+        T('T5', 8, 3, 1, 1, 'nsew'), T('T6', 12, 3, 1, 1, 'ns'),
+        T('M1', 0, 7, 1, 4, 'nsew'), T('S1', 8, 7, 0, 2, 'n'), T('S2', 11, 7, 0, 2, 'n'),
+        T('CT', 0, 11, 1, 6, 's')
+      ]
+    },
+    {
+      id: 'chilis', name: "Chili's", kind: 'Restaurant',
+      mode: 'private', hours: 'Open until 11 PM', busy: 0.7,
+      t: [
+        T('B1', 0, 0, 1, 2, 'ns'), T('B2', 3, 0, 1, 2, 'ns'), T('B3', 6, 0, 1, 2, 'ns'),
+        T('B4', 9, 0, 1, 2, 'ns'), T('B5', 12, 0, 1, 2, 'ns'),
+        T('T1', 0, 4, 1, 1, 'nsew'), T('T2', 5, 4, 1, 1, 'nsew'), T('T3', 10, 4, 1, 1, 'nsew'),
+        T('X1', 0, 8, 1, 2, 'nsew'), T('X2', 5, 8, 1, 2, 'nsew'), T('X3', 10, 8, 1, 2, 'nsew'),
+        T('BAR', 0, 12, 1, 10, 'n')
+      ]
+    },
+    {
+      id: 'texas-roadhouse', name: 'Texas Roadhouse', kind: 'Restaurant',
+      mode: 'private', hours: 'Open until 10 PM', busy: 0.85,
+      t: [
+        T('H1', 0, 0, 1, 6, 'n'),
+        T('A1', 0, 3, 1, 5, 'nsew'), T('A2', 8, 3, 1, 4, 'nsew'),
+        T('B1', 0, 7, 1, 5, 'nsew'), T('B2', 8, 7, 1, 4, 'nsew'),
+        T('C1', 0, 11, 1, 1, 'nsew'), T('C2', 5, 11, 1, 1, 'nsew'), T('C3', 10, 11, 1, 1, 'nsew'),
+        T('BAR', 0, 15, 1, 10, 'n')
+      ]
+    }
+  ];
+})();
