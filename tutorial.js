@@ -21,7 +21,7 @@
     el.innerHTML = `<div class="demo seatdemo">
       <div class="sd-top">
         <span class="seat open" id="d-seat" aria-hidden="true"></span>
-        <div class="sd-read" aria-live="polite"><div><b id="d-num">0</b> lb added</div><div class="state open" id="d-state">Open</div></div>
+        <div class="sd-read" aria-live="polite"><div><b id="d-num">0</b> lb</div><div class="state open" id="d-state">Open</div></div>
       </div>
       <div class="gauge" id="d-gauge" role="img" aria-label="Weight on the seat compared to the ${T} pound line"><i id="d-fill" style="width:0"></i><u style="left:${(T / MAX) * 100}%"><span>${T} lb line</span></u></div>
       <div class="btnrow">
@@ -34,7 +34,7 @@
     </div>`;
     const q = (id) => el.querySelector(id);
     const why = {
-      30: `30 lb is under the ${T} lb line, so the seat stays open. A loaded backpack can't claim a seat.`,
+      30: `30 lb is under the ${T} lb line, so the seat stays open. At most places a loaded backpack can't claim a seat. A venue can lower the line so bags do count.`,
       120: `120 lb is over the line. After ${VS.TAKE_SECS} seconds it reads taken, so a quick lean doesn't count.`,
       0: `Nothing on the seat. It reads open after ${VS.FREE_SECS} seconds empty, so shifting around or a short break doesn't flip it.`
     };
@@ -171,53 +171,47 @@
   }
 
   function demoPads(el) {
-    // Illustration only. The smart foot feels part of the load, so its line sits at about a quarter of the full-seat line.
-    const LINE = 12, EMPTY = { light: 3, heavy: 10 }, ADD = { pack: 6, sit: 18 };
-    const st = { chair: 'light', load: 'pack' };
-    el.innerHTML = `<div class="demo"><div class="seg" id="pd-chair" role="group" aria-label="Chair type">
-        <button data-c="light">Light, 10 lb</button><button data-c="heavy">Heavy, 40 lb</button></div>
-      <div class="padrow" style="grid-template-columns:repeat(3,1fr)" id="pr"></div>
+    // The venue picks the weight line. A person reads far above either setting; a bag only counts if the line is low.
+    const st = { line: 50, load: 25 };
+    el.innerHTML = `<div class="demo"><div class="seg" id="pd-line" role="group" aria-label="Venue weight line">
+        <button data-l="50">People only, 50 lb</button><button data-l="10">Bags count, 10 lb</button></div>
+      <div class="padrow" style="grid-template-columns:repeat(2,1fr)" id="pr"></div>
       <div class="state-line" style="margin-bottom:8px"><b id="pr-tot"></b></div>
-      <div class="btnrow" style="margin-top:0"><button class="btn ghost" data-m="pack">Backpack on seat</button><button class="btn ghost" data-m="sit">Person sits</button></div>
+      <div class="btnrow" style="margin-top:0"><button class="btn ghost" data-m="25">Backpack on seat</button><button class="btn ghost" data-m="120">Person sits</button></div>
       <p class="hint" id="pr-msg"></p></div>`;
     const draw = () => {
-      const e = EMPTY[st.chair], a = ADD[st.load], now = e + a, taken = a >= LINE;
-      el.querySelector('#pr').innerHTML = `<div><small>Empty chair</small><b>${e} lb</b></div><div><small>Now</small><b>${now} lb</b></div><div><small>Added</small><b>${a} lb</b></div>`;
-      el.querySelector('#pr-tot').textContent = `Added ${a} lb vs a line of ${LINE} lb: ` + (taken ? 'counts as taken' : 'stays open');
-      el.querySelector('#pr-msg').textContent = st.load === 'pack'
-        ? 'A bag adds a little. It stays under the line on either chair, because only the added weight counts.'
-        : 'A person adds a lot. The light and the heavy chair both read taken after the delay, because the chair\'s own weight is subtracted.';
-      el.querySelectorAll('[data-c]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === st.chair)));
+      const taken = st.load >= st.line;
+      el.querySelector('#pr').innerHTML = `<div><small>Pad reads</small><b>${st.load} lb</b></div><div><small>Venue line</small><b>${st.line} lb</b></div>`;
+      el.querySelector('#pr-tot').textContent = taken ? 'Counts as taken' : 'Stays open';
+      el.querySelector('#pr-msg').textContent = st.load < 50
+        ? (taken ? 'This venue lets a bag hold a seat, so students can save one for a friend or a bathroom trip.' : 'A bag stays under this venue\'s line, so it cannot claim a seat.')
+        : 'A person is over either line, so the seat reads taken after the delay.';
+      el.querySelectorAll('[data-l]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.l === st.line)));
     };
     draw();
     el.addEventListener('click', (e) => {
-      const m = e.target.closest('[data-m]'), c = e.target.closest('[data-c]');
-      if (m) st.load = m.dataset.m;
-      if (c) st.chair = c.dataset.c;
-      if (m || c) draw();
+      const m = e.target.closest('[data-m]'), l = e.target.closest('[data-l]');
+      if (m) st.load = +m.dataset.m;
+      if (l) st.line = +l.dataset.l;
+      if (m || l) draw();
     });
   }
 
   function demoBooth(el) {
-    const t = { n: 'K1', r: 1, c: 2, sd: 'ns', bk: 1, bs: { st: 'o', at: Date.now() } };
+    const t = { n: 'K1', r: 1, c: 2, sd: 'ns', bk: 1 };
+    const seats = [mk(1), mk(0)];
     el.innerHTML = `<div class="demo mini"><div class="mt"><div class="mt-h"><b>Booth K1</b><span data-w></span></div><div class="tb" data-b style="${VS.tbStyle(t)}"></div></div>
-      <div class="btnrow"><button class="btn ghost" data-k="o">Mark open</button><button class="btn ghost" data-k="t">Mark taken</button></div>
-      <div class="btnrow" style="margin-top:8px"><button class="btn ghost" data-k="skip">Skip ahead 2 hours</button></div>
-      <p class="hint" data-h></p></div>`;
+      <p class="hint">Tap a bench to sit someone on it or clear it. One long pad covers each bench, so it reads taken or open, not seat by seat.</p></div>`;
     const draw = () => {
-      const st = VS.bState(t);
-      el.querySelector('[data-b]').innerHTML = VS.tbHTML(t, []);
-      el.querySelector('[data-w]').textContent = ({ o: 'Open', t: 'Taken', u: 'Unknown' })[st];
-      el.querySelector('[data-h]').textContent = st === 'u'
-        ? 'Nobody updated it for 2 hours, so it shows unknown instead of staying wrong.'
-        : 'Staff tap it by hand. Dashed bars mean a person set it, not a sensor.';
+      el.querySelector('[data-b]').innerHTML = VS.tbHTML(t, seats);
+      el.querySelector('[data-w]').textContent = openCount(seats) + ' of 2 benches open';
     };
     draw();
     el.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-k]');
+      const b = e.target.closest('.bench');
       if (!b) return;
-      if (b.dataset.k === 'skip') t.bs.at = Date.now() - (VS.BOOTH_HOURS * 3600e3 + 60e3);
-      else t.bs = { st: b.dataset.k, at: Date.now() };
+      const i = +b.dataset.s;
+      seats[i] = mk(!VS.isOcc(seats[i]));
       draw();
     });
   }
@@ -226,19 +220,19 @@
     el.innerHTML = `<div class="demo roles">
       <div><b>Visitors</b><span>Look up places, see open seats, save My locations. Cannot change anything.</span></div>
       <div><b>Venue or college staff</b><span>Set up the floor, publish it, pick public or private, set hours. Students never get this.</span></div>
-      <div><b>Vacantseat</b><span>Ships the pads and pucks, keeps the service running, swaps batteries.</span></div>
+      <div><b>Vacantseat</b><span>Our own installers place the pads and pucks. We run the service and replace dead units.</span></div>
     </div>`;
   }
 
   function demoBuild(el) {
-    el.innerHTML = `<div class="demo"><div class="list">${VS.PRESETS.map((p) => `<div><b>${VS.esc(p.name)}</b><span>${p.bk ? 'set by hand' : VS.chairsText(VS.chairs(p))}</span></div>`).join('')}</div>
+    el.innerHTML = `<div class="demo"><div class="list">${VS.PRESETS.map((p) => `<div><b>${VS.esc(p.name)}</b><span>${p.bk ? '2 benches' : VS.chairsText(VS.chairs(p))}</span></div>`).join('')}</div>
       <p class="hint">Change the size and which sides have chairs, then tap the grid to place it. Your draft saves as you go. Press Publish when it is ready for visitors.</p></div>`;
   }
 
   /* ---------- steps ---------- */
 
   const userSteps = [
-    { title: 'Every seat reports on its own', body: 'One smart foot replaces a foot on the chair and measures the weight added above the empty chair, so light and heavy chairs behave the same. It works on any chair with feet. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
+    { title: 'Every seat reports on its own', body: 'A thin pad about 6 by 6 inches sticks to the seat and measures the weight on it. It works on any seat, cushion, wood or metal. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
     { title: 'Tables are counted in seats', body: 'A 1x8 is one seat wide and eight long, with chairs down both long sides and on both ends: 18 in all. A bar has chairs on one side only.', demo: demoGroups },
     { title: 'Move a chair and the count follows', body: 'Chairs get dragged between tables all day, most of all in study spots. Nobody scans or types. A chair counts for whichever table puck it hears loudest, so a group table updates itself.', demo: demoMove },
     { title: 'Public: anyone can look', body: 'Colleges and cafes can open their seating to everyone. Search a place, save it to My locations, and check its floor before you walk over. Only the venue can change the floor plan.', demo: demoPublic },
@@ -247,9 +241,9 @@
   ];
 
   const bizSteps = [
-    { title: 'Stick a puck under each table', body: 'One small puck goes under each table top. Scan its code once and the table lands on your floor plan. Chairs find the nearest puck on their own, so they can move.', demo: demoSticker },
-    { title: 'Swap the chair feet', body: 'Each chair gets a set of four feet: one smart foot and three plain ones at the same height, so it sits level. One plug-in gateway per room does the rest.', demo: demoPads },
-    { title: 'Booths are set by hand', body: 'Fixed booths have no feet, so there is no sensor to swap in. Staff tap a booth to mark it open or taken. It shows as set by staff with a time, and goes back to unknown after 2 hours without an update.', demo: demoBooth },
+    { title: 'Stick a puck under each table', body: 'Our installers stick one small puck under each table top and scan its code once, so the table lands on your floor plan. Seats find the nearest puck on their own, so chairs can move.', demo: demoSticker },
+    { title: 'Stick a pad on each seat', body: 'A pad about 6 by 6 inches goes on the seat. Our installers place every pad, so there is nothing for your staff to do. You choose the weight line: people only, or let a bag hold a seat.', demo: demoPads },
+    { title: 'Booths get a longer pad', body: 'A longer pad goes on each booth bench. It reads the whole bench as open or taken, and booths are drawn as bars so they look different from chairs.', demo: demoBooth },
     { title: 'Who does what', body: 'Staff run the floor. Visitors only look. At a college, students can see the floor but only the college can change it.', demo: demoRoles },
     { title: 'You choose who sees it', body: 'Open it to everyone or keep it for staff behind a PIN. In this demo the PIN is 1234 and the phone checks it. In the real product Vacantseat\'s server checks it, and a published floor shows on every device, not just yours.', demo: demoAccess },
     { title: 'Build and publish your floor', body: 'Pick a table type, adjust it, and place it on a grid that matches your room. Publish when it is ready.', demo: demoBuild, last: 'Open the builder' }

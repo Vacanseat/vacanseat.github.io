@@ -16,10 +16,8 @@
     plus: svg('<path d="M12 5v14M5 12h14"/>', 20),
     minus: svg('<path d="M5 12h14"/>', 20),
     logo:
-      '<svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">' +
-      '<polygon points="9,2 23,2 30,9 30,23 23,30 9,30 2,23 2,9" fill="#2FDDA4"/>' +
-      '<polygon points="12,9 20,9 23,12 23,20 20,23 12,23 9,20 9,12" fill="#0A1226"/>' +
-      '<polygon points="14,13 18,13 19,14 19,18 18,19 14,19 13,18 13,14" fill="#9A6BFF"/></svg>'
+      '<svg viewBox="140 90 232 324" width="22" height="30" aria-hidden="true"><path d="M256 404C256 404 151 300 151 202A105 105 0 0 1 361 202C361 300 256 404 256 404Z" fill="#fff"/>' +
+      '<path d="M229 162V287M229 234H295M295 234V287" fill="none" stroke="#2E5EA0" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
 
   /* ---------- table geometry ---------- */
@@ -35,7 +33,7 @@
 
   // Chair positions (1-based grid cells) in a fixed order: north, east, south, west.
   VS.slots = (t) => {
-    if (t.bk) return [];
+    if (t.bk) { const f0 = VS.foot(t); return [{ row: 1, col: f0.ox + 1 }, { row: f0.oy + t.r + 1, col: f0.ox + 1 }]; }
     const k = VS.sides(t), f = VS.foot(t), out = [];
     if (k.n) for (let i = 0; i < t.c; i++) out.push({ row: 1, col: f.ox + 1 + i });
     if (k.e) for (let j = 0; j < t.r; j++) out.push({ row: f.oy + 1 + j, col: f.ox + t.c + 1 });
@@ -48,7 +46,7 @@
   VS.heightOf = (list) => list.reduce((m, t) => Math.max(m, t.y + VS.foot(t).h), 0);
 
   VS.sidesText = (t) => {
-    if (t.bk) return 'booth, set by staff';
+    if (t.bk) return 'booth, a long pad on each bench';
     if (t.r === 0) return t.c === 1 ? 'lounge chair' : 'sofa';
     const n = VS.sides(t);
     const count = ['n', 'e', 's', 'w'].filter((x) => n[x]).length;
@@ -74,9 +72,8 @@
   VS.tbHTML = (t, seats) => {
     const f = VS.foot(t), slots = VS.slots(t);
     if (t.bk) {
-      const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
-      const bench = (row) => `<span class="bench ${cls}" style="grid-row:${row};grid-column:${f.ox + 1}/span ${t.c}"></span>`;
-      return bench(1) + `<span class="top" style="grid-row:${f.oy + 1}/span ${t.r};grid-column:${f.ox + 1}/span ${t.c}"><span class="tl"><b>${VS.esc(t.n)}</b>${t.c >= 3 ? '<em>by hand</em>' : ''}</span></span>` + bench(f.oy + t.r + 1);
+      const bench = (i) => seats[i] ? `<span class="bench ${VS.seatCls(seats[i])}" data-s="${i}" style="grid-row:${slots[i].row};grid-column:${f.ox + 1}/span ${t.c}"></span>` : '';
+      return bench(0) + `<span class="top" style="grid-row:${f.oy + 1}/span ${t.r};grid-column:${f.ox + 1}/span ${t.c}"><span class="tl"><b>${VS.esc(t.n)}</b></span></span>` + bench(1);
     }
     let h = '';
     if (t.r > 0) {
@@ -96,13 +93,13 @@
   VS.tableBtn = (t, ti, seats, tag, extra) => {
     const left = `left:calc(var(--u)*${(t.x + VS.PAD) * 7});top:calc(var(--u)*${(t.y + VS.PAD) * 7})`;
     const open = seats.filter((s) => s && !VS.isOcc(s)).length;
-    const lbl = t.bk ? `Booth ${VS.esc(t.n)}, set by staff, ${{ o: 'open', t: 'taken', u: 'unknown' }[VS.bState(t)]}` : `Table ${VS.esc(t.n)}, ${t.r}x${t.c}, ${open} of ${seats.length} seats open`;
+    const lbl = t.bk ? `Booth ${VS.esc(t.n)}, ${open} of ${seats.length} benches open` : `Table ${VS.esc(t.n)}, ${t.r}x${t.c}, ${open} of ${seats.length} seats open`;
     return `<${tag} class="tb tbl ${extra || ''}" data-t="${ti}" style="${VS.tbStyle(t)};${left}" aria-label="${lbl}">${VS.tbHTML(t, seats)}</${tag}>`;
   };
 
   VS.counts = (p) => {
     let open = 0, total = 0;
-    p.tables.forEach((t) => t.seats.forEach((s) => { total++; if (!VS.isOcc(s)) open++; }));
+    p.tables.forEach((t) => !t.bk && t.seats.forEach((s) => { total++; if (!VS.isOcc(s)) open++; }));
     return { open, total, taken: total - open };
   };
 

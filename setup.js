@@ -49,16 +49,17 @@
       kind: KINDS.indexOf(d.kind) > -1 ? d.kind : 'Cafe',
       hours: typeof d.hours === 'string' ? d.hours.slice(0, 40) : '',
       pin: /^\d{4}$/.test(d.pin) ? d.pin : '1234',
+      line: Number.isFinite(+d.line) ? clamp(Math.round(+d.line / 5) * 5, 5, 100) : 50,
       t: d.t.map(clean).filter(Boolean).slice(0, MAX_TABLES)
     };
   };
 
-  S.kind = 'Cafe'; S.hours = ''; S.pin = '1234';
+  S.kind = 'Cafe'; S.hours = ''; S.pin = '1234'; S.line = 50;
   const draft = read(VS.store.get(KEY));
   if (draft) Object.assign(S, draft);
   let P = read(VS.store.get(PUB));   // the published copy: what the directory shows
 
-  const snap = () => ({ name: S.name, mode: S.mode, kind: S.kind, hours: S.hours, pin: S.pin, t: S.t.map((d) => Object.assign({}, d)) });
+  const snap = () => ({ name: S.name, mode: S.mode, kind: S.kind, hours: S.hours, pin: S.pin, line: S.line, t: S.t.map((d) => Object.assign({}, d)) });
   const save = () => { VS.store.set(KEY, snap()); drawState(); };
   const pubState = () => (!P ? 'Draft, not published yet' : JSON.stringify(P) === JSON.stringify(snap()) ? 'Published' : 'Unpublished changes');
 
@@ -67,7 +68,7 @@
     const i = VS.PLACES.findIndex((p) => p.id === 'custom');
     if (i > -1) VS.PLACES.splice(i, 1);
     if (!P || !P.t.length) return null;
-    const p = { id: 'custom', name: P.name.trim() || 'My place', kind: P.kind, mode: P.mode, hours: P.hours.trim() || 'Hours not set', pin: P.pin, busy: 0.55, t: P.t.map((d) => Object.assign({}, d)) };
+    const p = { id: 'custom', name: P.name.trim() || 'My place', kind: P.kind, mode: P.mode, hours: P.hours.trim() || 'Hours not set', pin: P.pin, line: P.line, busy: 0.55, t: P.t.map((d) => Object.assign({}, d)) };
     VS.seedPlace(p);
     VS.PLACES.unshift(p);
     return p;
@@ -88,7 +89,7 @@
 
   function drawPresets() {
     $('#s-presets').innerHTML = VS.PRESETS.map((p) =>
-      `<button data-preset="${p.id}" aria-pressed="${S.preset === p.id}">${VS.esc(p.name)}<small>${p.bk ? 'set by hand' : VS.chairsText(VS.chairs(p))}</small></button>`).join('');
+      `<button data-preset="${p.id}" aria-pressed="${S.preset === p.id}">${VS.esc(p.name)}<small>${p.bk ? '2 benches' : VS.chairsText(VS.chairs(p))}</small></button>`).join('');
   }
 
   function drawShape() {
@@ -103,7 +104,7 @@
     const t = Object.assign({ n: nextName(), r: sh.r, c: sh.c, sd: sh.sd }, bk ? { bk: 1 } : {});
     const f = VS.foot(t);
     $('#s-preview').innerHTML = `<div class="tb" style="${VS.tbStyle(t)}">${VS.tbHTML(t, allOpen(t))}</div>
-      <p>${bk ? 'Booth, no sensors. Staff set it open or taken by hand.' : VS.chairsText(VS.chairs(t)) + ','} ${f.w} by ${f.h} squares on the grid</p>`;
+      <p>${bk ? 'Booth, a long pad on each bench,' : VS.chairsText(VS.chairs(t)) + ','} ${f.w} by ${f.h} squares on the grid</p>`;
   }
 
   function drawFloor() {
@@ -124,6 +125,16 @@
   function drawMode() {
     $('#s-mode').innerHTML = ['public', 'private'].map((m) => `<button data-mode="${m}" aria-pressed="${S.mode === m}">${m[0].toUpperCase() + m.slice(1)}</button>`).join('');
     $('#s-pinwrap').hidden = S.mode !== 'private';
+  }
+
+  function drawLine() {
+    $('#s-lineset').innerHTML = [['People only', 50], ['Bags count', 10]].map(([n, v]) => `<button data-linepre="${v}" aria-pressed="${S.line === v}">${n}, ${v} lb</button>`).join('');
+    $('#s-line').innerHTML = `<button data-lstep="-5" aria-label="Lower the weight line"${S.line <= 5 ? ' disabled' : ''}>${VS.I.minus}</button>
+      <div><small>Weight line</small><strong>${S.line} lb</strong></div>
+      <button data-lstep="5" aria-label="Raise the weight line"${S.line >= 100 ? ' disabled' : ''}>${VS.I.plus}</button>`;
+    $('#s-linehint').textContent = S.line < 30
+      ? 'A loaded backpack (about 15 to 30 lb) will hold a seat. Good for libraries where students save seats.'
+      : 'A bag on the seat will not count. Only a person does. Good for restaurants and cafes.';
   }
 
   function drawKind() {
@@ -151,6 +162,10 @@
         <div class="field"><span>Type of place</span><div class="seg tight" id="s-kind" role="group" aria-label="Type of place"></div></div>
         <label class="field"><span>Hours shown to visitors</span><input id="s-hours" maxlength="40" autocomplete="off" placeholder="Open until 10 PM" value="${VS.esc(S.hours)}"></label>
         <div class="field"><span>Who can see the floor</span><div class="seg tight" id="s-mode" role="group" aria-label="Who can see this floor"></div></div>
+        <div class="field"><span>Weight line: a seat counts as taken at</span>
+          <div class="seg tight" id="s-lineset" role="group" aria-label="Weight line presets"></div>
+          <div class="stepper" id="s-line"></div>
+          <p class="hintline" id="s-linehint"></p></div>
         <label class="field" id="s-pinwrap"><span>Staff PIN, 4 digits</span><input id="s-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="${VS.esc(S.pin)}"></label>
         <section class="sect"><h2>Choose a table</h2><p>Pick the closest type, then adjust the size and which sides have chairs.</p>
           <div class="presets" id="s-presets"></div>
@@ -167,7 +182,7 @@
           <p class="note">Your changes save to a draft as you go. Visitors only see the floor after you publish.</p>
         </section>
       </div>`;
-    drawKind(); drawMode(); drawPresets(); drawShape(); drawFloor(); drawSel(); drawState();
+    drawKind(); drawLine(); drawMode(); drawPresets(); drawShape(); drawFloor(); drawSel(); drawState();
   }
 
   /* ---------- actions ---------- */
@@ -196,7 +211,7 @@
     S.sel = -1;
     save();
     drawFloor(); drawSel(); drawShape();
-    say(t.bk ? `Placed booth ${t.n}. Staff set it by hand. ${S.t.length} on the floor.` : `Placed ${t.n} with ${VS.chairsText(VS.chairs(t))}. ${S.t.length} table${S.t.length > 1 ? 's' : ''} on the floor.`);
+    say(t.bk ? `Placed booth ${t.n} with a long pad on each bench. ${S.t.length} on the floor.` : `Placed ${t.n} with ${VS.chairsText(VS.chairs(t))}. ${S.t.length} table${S.t.length > 1 ? 's' : ''} on the floor.`);
   }
 
   function setPreset(id) {
@@ -260,6 +275,8 @@
     if ((el = t.closest('[data-sclear]'))) return clearFloor(el);
     if (t.closest('[data-spub]')) return doPublish();
     if (t.closest('[data-slive]')) return goLive();
+    if ((el = t.closest('[data-linepre]'))) { S.line = +el.dataset.linepre; save(); return drawLine(); }
+    if ((el = t.closest('[data-lstep]'))) { S.line = clamp(S.line + +el.dataset.lstep, 5, 100); save(); return drawLine(); }
     if ((el = t.closest('[data-kind]'))) { S.kind = el.dataset.kind; save(); return drawKind(); }
     const fl = $('#s-floor');
     if (fl && fl.contains(t)) {

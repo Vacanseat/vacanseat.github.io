@@ -64,7 +64,7 @@
 
   function bkLine(p) {
     const b = VS.boothCounts(p);
-    return b.total ? `<p class="bksum" id="bk-sum">Booths, set by staff: <b>${b.open}</b> open, <b>${b.taken}</b> taken${b.unknown ? `, <b>${b.unknown}</b> unknown` : ''}</p>` : '';
+    return b.total ? `<p class="bksum" id="bk-sum">Booth benches: <b>${b.open}</b> open of ${b.total}</p>` : '';
   }
 
   function renderPlace(p, staff) {
@@ -82,7 +82,7 @@
         <button class="btn ghost block savebtn" data-save="${p.id}" aria-pressed="${isSaved(p.id)}">${isSaved(p.id) ? 'Saved to My locations' : 'Save to My locations'}</button>
         <div class="details"><div><span>Hours</span><b>${VS.esc(p.hours)}</b></div><div><span>Setup</span><b>${p.tables.filter((t) => !t.bk).length} tables, ${c.total} chairs${p.tables.some((t) => t.bk) ? ', ' + p.tables.filter((t) => t.bk).length + ' booths' : ''}</b></div><div><span>Access</span><b>${p.mode === 'public' ? 'Public' : 'Private, PIN'}</b></div></div>
         <p class="managed">${/college/i.test(p.kind) ? 'Managed by college staff. Students can view the floor but cannot change it.' : 'Managed by the venue. Visitors can view the floor but cannot change it.'}</p>
-        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table puck</span>${p.tables.some((t) => t.bk) ? '<span><i class="bench open"></i>Booth, set by staff</span>' : ''}</div>
+        <div class="legend"><span><i class="seat open"></i>Open</span><span><i class="seat occ"></i>Taken</span><span><i class="hub"></i>Table puck</span>${p.tables.some((t) => t.bk) ? '<span><i class="bench open"></i>Booth bench</span>' : ''}</div>
         <div class="floor" id="floor">${p.tables.map((t, ti) => VS.tableBtn(t, ti, t.seats, 'button')).join('')}</div>
         <div class="lvl"><p>Demo controls. Change how busy the room is.</p>
           <div class="seg" role="group" aria-label="Room busyness">
@@ -116,9 +116,8 @@
     $$('#floor .tbl').forEach((el) => {
       const t = p.tables[+el.dataset.t];
       if (t.bk) {
-        const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
-        $$('.bench', el).forEach((b) => { b.className = 'bench ' + cls; });
-        el.setAttribute('aria-label', `Booth ${t.n}, set by staff, ${{ o: 'open', t: 'taken', u: 'unknown' }[st]}`);
+        $$('.bench', el).forEach((b) => { b.className = 'bench ' + VS.seatCls(t.seats[+b.dataset.s]); });
+        el.setAttribute('aria-label', `Booth ${t.n}, ${t.seats.filter((x) => !VS.isOcc(x)).length} of ${t.seats.length} benches open`);
         return;
       }
       $$('.seat', el).forEach((el2) => {
@@ -165,20 +164,17 @@
       <div class="sh-head"><div><h2>Table ${VS.esc(t.n)}</h2><p class="sub">${size}, ${tc.total} chair${tc.total > 1 ? 's' : ''}</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
       <p class="sh-big"><strong>${tc.open}</strong>of ${tc.total} open</p>
       <div class="sgrid">${t.seats.map((s, i) => `<div class="cell"><span class="seat ${VS.seatCls(s)}"></span><small>${s.lb}<span class="sr"> pounds, chair ${i + 1}, ${VS.isOcc(s) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
-      <p class="note">Numbers are pounds added above the empty chair, so a light chair and a heavy chair behave the same. ${VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The puck under this table adds the chairs up.</p>`;
+      <p class="note">Numbers are pounds on each seat pad. ${p.line || VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken. It reads open again after ${VS.FREE_SECS} seconds under that. A faded chair is waiting out one of those timers. The puck under this table adds the chairs up. This venue sets the line at ${p.line || VS.THRESHOLD} lb${(p.line || VS.THRESHOLD) < 30 ? ', so a bag on a seat counts as taken' : ', so a bag on a seat does not count'}.</p>`;
   }
 
   function boothSheetHTML(p, t) {
-    const st = VS.bState(t), cls = st === 't' ? 'occ' : st === 'u' ? 'unk' : 'open';
-    const word = { o: 'Open', t: 'Taken', u: 'Unknown' }[st];
-    const when = st === 'u' ? `Nobody has updated this booth for over ${VS.BOOTH_HOURS} hours, so it shows unknown.` : `Set by staff ${VS.ago(t.bs.at)}`;
-    const ctl = VS.admin
-      ? `<div class="btnrow"><button class="btn ghost" data-bset="o">Mark open</button><button class="btn" data-bset="t">Mark taken</button></div>`
-      : '<p class="note">Only venue staff can change a booth. Sign in from Set up your floor to try it.</p>';
+    const open = t.seats.filter((x) => !VS.isOcc(x)).length;
+    const names = ['North bench', 'South bench'];
     return `<div class="grab"></div>
-      <div class="sh-head"><div><h2>Booth ${VS.esc(t.n)}</h2><p class="sub">Set by staff, not by a sensor</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
-      <p class="bigstate ${cls}">${word}</p><p class="when">${when}</p>${ctl}
-      <p class="note">Fixed booths have no feet to put a sensor in, so staff tap them by hand. A booth with no update for ${VS.BOOTH_HOURS} hours goes back to unknown, about the length of a meal.</p>`;
+      <div class="sh-head"><div><h2>Booth ${VS.esc(t.n)}</h2><p class="sub">Two benches, one long pad on each</p></div><button class="iconbtn" data-close aria-label="Close">${VS.I.close}</button></div>
+      <p class="sh-big"><strong>${open}</strong>of ${t.seats.length} benches open</p>
+      <div class="sgrid">${t.seats.map((s, i) => `<div class="cell"><span class="bench ${VS.seatCls(s)}" style="width:44px;height:24px"></span><small>${s.lb}<span class="sr"> pounds, ${names[i]}, ${VS.isOcc(s) ? 'taken' : 'open'}</span></small></div>`).join('')}</div>
+      <p class="note">Fixed booths have no feet, so a long pad sits on each bench cushion. Numbers are pounds on the pad. ${p.line || VS.THRESHOLD} lb held for ${VS.TAKE_SECS} seconds counts as taken, and one pad covers the whole bench, so it cannot tell how many people sit there.</p>`;
   }
 
   const sheetHTML = (p, t) => (t.bk ? boothSheetHTML(p, t) : tableSheetHTML(p, t));
@@ -287,14 +283,6 @@
     if ((el = t.closest('[data-staff]'))) return staffGo(el.dataset.staff);
     if (t.closest('[data-gate-go]')) return gateGo();
     if (t.closest('[data-home]')) { location.hash = '#/'; return; }
-    if ((el = t.closest('[data-bset]'))) {
-      if (!VS.admin || !sheetCtx) return;
-      const bt = sheetCtx.p.tables[sheetCtx.ti];
-      bt.bs = { st: el.dataset.bset, at: Date.now() };
-      $('.panel', sheet).innerHTML = sheetHTML(sheetCtx.p, bt);
-      paint(sheetCtx.p, true);
-      return;
-    }
     if ((el = t.closest('[data-save]'))) {
       const on = toggleSaved(el.dataset.save);
       el.setAttribute('aria-pressed', String(on));

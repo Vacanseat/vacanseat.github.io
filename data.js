@@ -1,9 +1,9 @@
 window.VS = window.VS || {};
 
-// Sensing rule. A seat reads taken after THRESHOLD lb is held for TAKE_SECS.
-// It reads open again after less than THRESHOLD lb is held for FREE_SECS.
-// A loaded backpack runs about 15 to 30 lb. A seated person puts roughly 60 to 80 percent
-// of their body weight on the seat, so a 100 lb person reads around 60 to 80 lb.
+// Sensing rule. A seat pad reads taken after the weight line is held for TAKE_SECS.
+// It reads open again after less than the line is held for FREE_SECS.
+// THRESHOLD is the default line. Each venue can set its own: a loaded backpack runs about
+// 15 to 30 lb, so a line of 50 ignores bags and a line near 10 lets a bag hold a seat.
 VS.THRESHOLD = 50;
 VS.TAKE_SECS = 10;
 VS.FREE_SECS = 60;
@@ -18,8 +18,8 @@ VS.COLS = 14;
 VS.PAD = 0.5; // empty margin around the floor, in seat widths
 
 (function () {
-  // bk marks a booth: no feet to sense, so staff set its status by hand. old seeds one that nobody has updated in 3 hours.
-  const T = (n, x, y, r, c, sd, bk, old) => Object.assign({ n, x, y, r, c, sd }, bk ? { bk: 1 } : {}, old ? { old: 1 } : {});
+  // bk marks a booth: a bench on each side, each covered by one long pad.
+  const T = (n, x, y, r, c, sd, bk) => Object.assign({ n, x, y, r, c, sd }, bk ? { bk: 1 } : {});
 
   VS.PLACES = [
     {
@@ -56,7 +56,7 @@ VS.PAD = 0.5; // empty margin around the floor, in seat widths
         T('T5', 8, 3, 1, 1, 'nsew'), T('T6', 12, 3, 1, 1, 'ns'),
         T('M1', 0, 7, 1, 4, 'nsew'), T('S1', 8, 7, 0, 2, 'n'), T('S2', 11, 7, 0, 2, 'n'),
         T('CT', 0, 11, 1, 6, 's'),
-        T('K1', 0, 14, 1, 2, 'ns', 1), T('K2', 3, 14, 1, 2, 'ns', 1, 1)
+        T('K1', 0, 14, 1, 2, 'ns', 1), T('K2', 3, 14, 1, 2, 'ns', 1)
       ]
     },
     {
