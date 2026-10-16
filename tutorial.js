@@ -232,7 +232,7 @@
   /* ---------- steps ---------- */
 
   const userSteps = [
-    { title: 'Every seat reports on its own', body: 'A thin pad about 6 by 6 inches sticks to the seat and measures the weight on it. It works on any seat, cushion, wood or metal. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
+    { title: 'Every seat reports on its own', body: 'A thin pad about 12 by 12 inches with a soft top sticks to the seat and measures the weight on it. It works on any seat, wood, metal or padded. It only measures weight. No camera, no names, no GPS.', demo: demoSeat },
     { title: 'Tables are counted in seats', body: 'A 1x8 is one seat wide and eight long, with chairs down both long sides and on both ends: 18 in all. A bar has chairs on one side only.', demo: demoGroups },
     { title: 'Move a chair and the count follows', body: 'Chairs get dragged between tables all day, most of all in study spots. Nobody scans or types. A chair counts for whichever table puck it hears loudest, so a group table updates itself.', demo: demoMove },
     { title: 'Public: anyone can look', body: 'Colleges and cafes can open their seating to everyone. Search a place, save it to My locations, and check its floor before you walk over. Only the venue can change the floor plan.', demo: demoPublic },
@@ -242,7 +242,7 @@
 
   const bizSteps = [
     { title: 'Stick a puck under each table', body: 'Our installers stick one small puck under each table top and scan its code once, so the table lands on your floor plan. Seats find the nearest puck on their own, so chairs can move.', demo: demoSticker },
-    { title: 'Stick a pad on each seat', body: 'A pad about 6 by 6 inches goes on the seat. Our installers place every pad, so there is nothing for your staff to do. You choose the weight line: people only, or let a bag hold a seat.', demo: demoPads },
+    { title: 'Stick a pad on each seat', body: 'A pad about 12 by 12 inches, covered in a soft cushion layer, goes on the seat. Our installers place every pad, so there is nothing for your staff to do. You choose the weight line: people only, or let a bag hold a seat.', demo: demoPads },
     { title: 'Booths get a longer pad', body: 'A longer pad goes on each booth bench. It reads the whole bench as open or taken, and booths are drawn as bars so they look different from chairs.', demo: demoBooth },
     { title: 'Who does what', body: 'Staff run the floor. Visitors only look. At a college, students can see the floor but only the college can change it.', demo: demoRoles },
     { title: 'You choose who sees it', body: 'Open it to everyone or keep it for staff behind a PIN. In this demo the PIN is 1234 and the phone checks it. In the real product Vacanseat\'s server checks it, and a published floor shows on every device, not just yours.', demo: demoAccess },
