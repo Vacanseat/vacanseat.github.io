@@ -32,7 +32,7 @@
 
   function renderList() {
     view.innerHTML = `
-      <header class="bar"><div class="brand">${VS.I.logo}<span>Vacantseat</span></div><button class="iconbtn" data-help aria-label="How it works">${VS.I.help}</button></header>
+      <header class="bar"><div class="brand">${VS.I.logo}<span>Vacanseat</span></div><button class="iconbtn" data-help aria-label="How it works">${VS.I.help}</button></header>
       <div class="wrap">
         <h1 class="title">Find a seat</h1>
         <label class="search"><span class="sr">Search places</span>${VS.I.search}<input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search places" value="${VS.esc(state.q)}"></label>
@@ -57,7 +57,7 @@
       ? items.map((p) => VS.cardHTML(p)).join('')
       : state.filter === 'saved' && !q
         ? '<p class="sub" style="padding:18px 4px">Nothing saved yet. Open a place and tap Save to My locations.</p>'
-        : '<p class="sub" style="padding:18px 4px">No places match. If a venue uses Vacantseat, search its name or type. If it does not show up, it has not set up yet.</p>';
+        : '<p class="sub" style="padding:18px 4px">No places match. If a venue uses Vacanseat, search its name or type. If it does not show up, it has not set up yet.</p>';
   }
 
   /* ---------- place ---------- */
@@ -207,7 +207,7 @@
         <p class="note" style="font-size:16px;margin-top:0">Only venue staff can set up or change a floor. Colleges work the same way: staff edit, students only view.</p>
         <label class="field" style="margin-top:18px"><span>Venue PIN</span><input id="gate-pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="4 digits"></label>
         <p class="err" id="gate-err" role="alert"></p>
-        <p class="note" style="margin-top:0">Demo PIN: ${DEMO_VENUE_PIN}. In the real product the PIN is checked on Vacantseat's server and published floors reach every device. This demo checks it on the phone.</p>
+        <p class="note" style="margin-top:0">Demo PIN: ${DEMO_VENUE_PIN}. In the real product the PIN is checked on Vacanseat's server and published floors reach every device. This demo checks it on the phone.</p>
         <div class="btnrow"><button class="btn" data-gate-go>Sign in</button></div>
       </div>`;
   }

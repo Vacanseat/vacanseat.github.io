@@ -1,6 +1,6 @@
 {
-  "name": "Vacantseat",
-  "short_name": "Vacantseat",
+  "name": "Vacanseat",
+  "short_name": "Vacanseat",
   "description": "See which seats are open before you walk over.",
   "start_url": "./",
   "scope": "./",

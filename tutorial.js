@@ -220,7 +220,7 @@
     el.innerHTML = `<div class="demo roles">
       <div><b>Visitors</b><span>Look up places, see open seats, save My locations. Cannot change anything.</span></div>
       <div><b>Venue or college staff</b><span>Set up the floor, publish it, pick public or private, set hours. Students never get this.</span></div>
-      <div><b>Vacantseat</b><span>Our own installers place the pads and pucks. We run the service and replace dead units.</span></div>
+      <div><b>Vacanseat</b><span>Our own installers place the pads and pucks. We run the service and replace dead units.</span></div>
     </div>`;
   }
 
@@ -245,7 +245,7 @@
     { title: 'Stick a pad on each seat', body: 'A pad about 6 by 6 inches goes on the seat. Our installers place every pad, so there is nothing for your staff to do. You choose the weight line: people only, or let a bag hold a seat.', demo: demoPads },
     { title: 'Booths get a longer pad', body: 'A longer pad goes on each booth bench. It reads the whole bench as open or taken, and booths are drawn as bars so they look different from chairs.', demo: demoBooth },
     { title: 'Who does what', body: 'Staff run the floor. Visitors only look. At a college, students can see the floor but only the college can change it.', demo: demoRoles },
-    { title: 'You choose who sees it', body: 'Open it to everyone or keep it for staff behind a PIN. In this demo the PIN is 1234 and the phone checks it. In the real product Vacantseat\'s server checks it, and a published floor shows on every device, not just yours.', demo: demoAccess },
+    { title: 'You choose who sees it', body: 'Open it to everyone or keep it for staff behind a PIN. In this demo the PIN is 1234 and the phone checks it. In the real product Vacanseat\'s server checks it, and a published floor shows on every device, not just yours.', demo: demoAccess },
     { title: 'Build and publish your floor', body: 'Pick a table type, adjust it, and place it on a grid that matches your room. Publish when it is ready.', demo: demoBuild, last: 'Open the builder' }
   ];
 
